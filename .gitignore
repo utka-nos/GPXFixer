@@ -1,5 +1,6 @@
 .gradle/
 .gradle-home/
+.kotlin/
 build/
 /local.properties
 /.idea/
@@ -8,3 +9,15 @@ build/
 *.iml
 xcuserdata/
 DerivedData/
+**/.kotlin/
+
+# Xcode workspace settings (user-specific)
+*.xcworkspace/
+project.xcworkspace/
+xcshareddata/
+
+# Xcode user state
+*.xcuserstate
+
+# iOS Assets (generated)
+*.xcassets/
