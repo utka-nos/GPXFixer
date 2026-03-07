@@ -1,0 +1,10 @@
+.gradle/
+.gradle-home/
+build/
+/local.properties
+/.idea/
+.DS_Store
+**/build/
+*.iml
+xcuserdata/
+DerivedData/
