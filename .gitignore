@@ -21,5 +21,8 @@ xcshareddata/
 # Xcode user state
 *.xcuserstate
 
+# Local iOS signing settings
+iosApp/GPXFixer/Config/LocalSigning.xcconfig
+
 # iOS Assets (generated)
 *.xcassets/

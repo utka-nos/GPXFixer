@@ -1,0 +1,9 @@
+// Shared iOS signing defaults.
+// Create Config/LocalSigning.xcconfig for machine-specific values.
+
+CODE_SIGN_STYLE = Automatic
+GPX_DEVELOPMENT_TEAM =
+
+#include? "LocalSigning.xcconfig"
+
+DEVELOPMENT_TEAM = $(GPX_DEVELOPMENT_TEAM)

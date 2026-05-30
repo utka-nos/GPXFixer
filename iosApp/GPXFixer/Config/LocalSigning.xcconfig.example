@@ -1,0 +1,4 @@
+// Copy this file to LocalSigning.xcconfig and set your local Apple Team ID.
+// LocalSigning.xcconfig is ignored by git.
+
+GPX_DEVELOPMENT_TEAM = YOUR_TEAM_ID
