@@ -118,12 +118,16 @@
 /* Begin PBXShellScriptBuildPhase section */
 		BDAA377753A096C75103911B /* Compile Kotlin */ = {
 			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
 			inputPaths = (
 			);
 			name = "Compile Kotlin";
 			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
 			shellScript = "cd \"$SRCROOT/../..\"\n./gradlew :shared:embedAndSignAppleFrameworkForXcode";
 		};
 /* End PBXShellScriptBuildPhase section */
@@ -270,7 +274,8 @@
 					"$(inherited)",
 					"$(SRCROOT)/../shared/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)",
 				);
-				GENERATE_INFOPLIST_FILE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Info.plist;
 				INFOPLIST_KEY_CADisableMinimumFrameDurationOnPhone = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -311,7 +316,8 @@
 					"$(inherited)",
 					"$(SRCROOT)/../shared/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)",
 				);
-				GENERATE_INFOPLIST_FILE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Info.plist;
 				INFOPLIST_KEY_CADisableMinimumFrameDurationOnPhone = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
