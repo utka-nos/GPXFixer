@@ -153,9 +153,11 @@ private struct EditableTrackMap: UIViewRepresentable {
         guard let geometry = EditableTrackMapGeometry(document: document) else {
             mapView.removeOverlays(mapView.overlays)
             mapView.removeAnnotations(mapView.annotations)
+            context.coordinator.points = []
             context.coordinator.didSetInitialVisibleMapRect = false
             return
         }
+        context.coordinator.points = geometry.points
 
         mapView.removeOverlays(mapView.overlays)
         mapView.removeAnnotations(mapView.annotations)
@@ -164,14 +166,15 @@ private struct EditableTrackMap: UIViewRepresentable {
             MKPolyline(coordinates: coordinates, count: coordinates.count)
         }
         mapView.addOverlays(overlays)
-        mapView.addAnnotations(
-            geometry.points.map { point in
+        if let selectedPointIndex,
+           let selectedPoint = geometry.points.first(where: { $0.index == selectedPointIndex }) {
+            mapView.addAnnotation(
                 EditableTrackPointAnnotation(
-                    pointIndex: point.index,
-                    coordinate: point.coordinate
+                    pointIndex: selectedPoint.index,
+                    coordinate: selectedPoint.coordinate
                 )
-            }
-        )
+            )
+        }
 
         if !context.coordinator.didSetInitialVisibleMapRect {
             mapView.setVisibleMapRect(
@@ -187,6 +190,7 @@ private struct EditableTrackMap: UIViewRepresentable {
         var selectedPointIndex: Binding<Int?>
         var isMovingPoint: Bool
         var onMapTap: (CLLocationCoordinate2D) -> Void
+        var points: [EditableTrackPoint] = []
         var didSetInitialVisibleMapRect = false
 
         init(
@@ -200,13 +204,37 @@ private struct EditableTrackMap: UIViewRepresentable {
         }
 
         @objc func handleMapTap(_ recognizer: UITapGestureRecognizer) {
-            guard isMovingPoint, let mapView = recognizer.view as? MKMapView else {
+            guard let mapView = recognizer.view as? MKMapView else {
                 return
             }
 
             let point = recognizer.location(in: mapView)
             let coordinate = mapView.convert(point, toCoordinateFrom: mapView)
-            onMapTap(coordinate)
+            if isMovingPoint {
+                onMapTap(coordinate)
+            } else if let nearestPoint = nearestPoint(to: point, in: mapView) {
+                selectedPointIndex.wrappedValue = nearestPoint.index
+            }
+        }
+
+        private func nearestPoint(
+            to tapPoint: CGPoint,
+            in mapView: MKMapView,
+            maxDistance: CGFloat = 48
+        ) -> EditableTrackPoint? {
+            points
+                .map { point in
+                    let screenPoint = mapView.convert(point.coordinate, toPointTo: mapView)
+                    let distance = hypot(screenPoint.x - tapPoint.x, screenPoint.y - tapPoint.y)
+                    return (point: point, distance: distance)
+                }
+                .filter { candidate in
+                    candidate.distance <= maxDistance
+                }
+                .min { lhs, rhs in
+                    lhs.distance < rhs.distance
+                }?
+                .point
         }
 
         func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
@@ -263,7 +291,7 @@ extension EditableTrackMap.Coordinator: UIGestureRecognizerDelegate {
         _ gestureRecognizer: UIGestureRecognizer,
         shouldReceive touch: UITouch
     ) -> Bool {
-        return !(touch.view is MKAnnotationView)
+        return true
     }
 }
 

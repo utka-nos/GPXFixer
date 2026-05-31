@@ -37,6 +37,7 @@ import com.gpxeditor.shared.domain.gpx.GpxDocument
 import com.gpxeditor.shared.feature.edittrack.DeleteGpxTrackPointResult
 import com.gpxeditor.shared.feature.edittrack.MoveGpxTrackPointResult
 import com.gpxeditor.shared.feature.trackdetail.TrackDetail
+import kotlin.math.hypot
 
 @Composable
 fun TrackEditScreen(
@@ -73,6 +74,7 @@ fun TrackEditScreen(
             EditableTrackMap(
                 geometry = geometry,
                 selectedPointIndex = selectedPointIndex,
+                isMovingPoint = movingPointIndex != null,
                 onPointClick = { pointIndex ->
                     if (movingPointIndex == null) {
                         selectedPointIndex = pointIndex
@@ -250,6 +252,7 @@ private fun SelectedPointMenu(
 private fun EditableTrackMap(
     geometry: EditableTrackMapGeometry,
     selectedPointIndex: Int?,
+    isMovingPoint: Boolean,
     onPointClick: (Int) -> Unit,
     onMapClick: (LatLng) -> Unit,
     modifier: Modifier = Modifier,
@@ -289,7 +292,15 @@ private fun EditableTrackMap(
             zoomGesturesEnabled = true,
         ),
         onMapLoaded = { mapLoaded = true },
-        onMapClick = onMapClick,
+        onMapClick = { position ->
+            if (isMovingPoint) {
+                onMapClick(position)
+            } else {
+                cameraPositionState.projection
+                    ?.let { projection -> geometry.nearestPoint(position = position, projection = projection) }
+                    ?.let { point -> onPointClick(point.index) }
+            }
+        },
     ) {
         geometry.polylines.forEach { points ->
             Polyline(
@@ -299,15 +310,12 @@ private fun EditableTrackMap(
             )
         }
 
-        geometry.points.forEach { point ->
-            val isSelected = point.index == selectedPointIndex
+        geometry.points.firstOrNull { it.index == selectedPointIndex }?.let { point ->
             Marker(
                 state = MarkerState(position = point.position),
                 title = "Point ${point.index + 1}",
-                icon = BitmapDescriptorFactory.defaultMarker(
-                    if (isSelected) BitmapDescriptorFactory.HUE_ORANGE else BitmapDescriptorFactory.HUE_AZURE,
-                ),
-                zIndex = if (isSelected) 1f else 0f,
+                icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_ORANGE),
+                zIndex = 1f,
                 onClick = {
                     onPointClick(point.index)
                     true
@@ -359,6 +367,28 @@ private data class EditableTrackMapGeometry(
         private fun LatLng.isValid(): Boolean {
             return latitude in -90.0..90.0 && longitude in -180.0..180.0
         }
+    }
+
+    fun nearestPoint(
+        position: LatLng,
+        projection: com.google.android.gms.maps.Projection,
+        maxDistancePixels: Double = 48.0,
+    ): EditableTrackPoint? {
+        val tapPoint = projection.toScreenLocation(position)
+
+        return points
+            .asSequence()
+            .map { point ->
+                val screenPoint = projection.toScreenLocation(point.position)
+                val distance = hypot(
+                    (screenPoint.x - tapPoint.x).toDouble(),
+                    (screenPoint.y - tapPoint.y).toDouble(),
+                )
+                point to distance
+            }
+            .filter { (_, distance) -> distance <= maxDistancePixels }
+            .minByOrNull { (_, distance) -> distance }
+            ?.first
     }
 }
 
