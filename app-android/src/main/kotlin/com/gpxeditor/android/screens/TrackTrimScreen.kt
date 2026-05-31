@@ -23,7 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.gpxeditor.shared.domain.gpx.GpxDocument
+import com.gpxeditor.shared.domain.activity.ActivityDocument
 import com.gpxeditor.shared.feature.edittrack.TrimGpxTrackResult
 import com.gpxeditor.shared.feature.trackdetail.TrackDetail
 
@@ -34,8 +34,8 @@ fun TrackTrimScreen(
     statusMessage: String?,
     errorMessage: String?,
     onBackClick: () -> Unit,
-    onPreviewTrim: (GpxDocument, Int, Int) -> TrimGpxTrackResult,
-    onSaveClick: (GpxDocument) -> Unit,
+    onPreviewTrim: (ActivityDocument, Int, Int) -> TrimGpxTrackResult,
+    onSaveClick: (ActivityDocument) -> Unit,
 ) {
     val context = LocalContext.current
     val originalPointCount = detail.summary.pointCount

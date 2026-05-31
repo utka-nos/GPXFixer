@@ -4,7 +4,7 @@ import shared
 
 @MainActor
 final class IOSTrackEditViewModel: ObservableObject {
-    @Published var document: GpxDocument
+    @Published var document: ActivityDocument
     @Published var selectedPointIndex: Int?
     @Published var movingPointIndex: Int?
     @Published var errorMessage: String?

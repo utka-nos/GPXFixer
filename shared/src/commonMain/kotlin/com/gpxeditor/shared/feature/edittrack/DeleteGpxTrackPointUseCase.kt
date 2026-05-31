@@ -1,9 +1,9 @@
 package com.gpxeditor.shared.feature.edittrack
 
-import com.gpxeditor.shared.domain.gpx.GpxDocument
-import com.gpxeditor.shared.domain.gpx.GpxTrack
-import com.gpxeditor.shared.domain.gpx.GpxTrackPoint
-import com.gpxeditor.shared.domain.gpx.GpxTrackSegment
+import com.gpxeditor.shared.domain.activity.ActivityDocument
+import com.gpxeditor.shared.domain.activity.ActivityPoint
+import com.gpxeditor.shared.domain.activity.ActivitySegment
+import com.gpxeditor.shared.domain.activity.ActivityTrack
 import com.gpxeditor.shared.feature.trackdetail.TrackSummary
 import com.gpxeditor.shared.feature.trackdetail.TrackSummaryCalculator
 
@@ -35,17 +35,17 @@ class DeleteGpxTrackPointUseCase {
         totalPointCount: Int,
     ): DeleteGpxTrackPointError? {
         return when {
-            totalPointCount == 0 -> DeleteGpxTrackPointError("Cannot delete a point from an empty GPX document.")
+            totalPointCount == 0 -> DeleteGpxTrackPointError("Cannot delete a point from an empty activity document.")
             pointIndex < 0 -> DeleteGpxTrackPointError("Point index must be zero or greater.")
-            pointIndex >= totalPointCount -> DeleteGpxTrackPointError("Point index is outside the GPX document point range.")
+            pointIndex >= totalPointCount -> DeleteGpxTrackPointError("Point index is outside the activity document point range.")
             else -> null
         }
     }
 
     private fun deletePointAt(
-        tracks: List<GpxTrack>,
+        tracks: List<ActivityTrack>,
         pointIndexToDelete: Int,
-    ): List<GpxTrack> {
+    ): List<ActivityTrack> {
         var currentPointIndex = 0
 
         return tracks.mapNotNull { track ->
@@ -67,7 +67,7 @@ class DeleteGpxTrackPointUseCase {
         }
     }
 
-    private fun GpxTrackSegment.withPointsOrNull(points: List<GpxTrackPoint>): GpxTrackSegment? {
+    private fun ActivitySegment.withPointsOrNull(points: List<ActivityPoint>): ActivitySegment? {
         return if (points.isEmpty()) {
             null
         } else {
@@ -77,13 +77,13 @@ class DeleteGpxTrackPointUseCase {
 }
 
 data class DeleteGpxTrackPointRequest(
-    val document: GpxDocument,
+    val document: ActivityDocument,
     val pointIndex: Int,
 )
 
 sealed interface DeleteGpxTrackPointResult {
     data class Success(
-        val document: GpxDocument,
+        val document: ActivityDocument,
         val summary: TrackSummary,
         val deletedPointIndex: Int,
     ) : DeleteGpxTrackPointResult
@@ -96,3 +96,4 @@ sealed interface DeleteGpxTrackPointResult {
 data class DeleteGpxTrackPointError(
     val message: String,
 )
+

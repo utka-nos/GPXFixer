@@ -5,8 +5,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.gpxeditor.android.data.imported.JsonImportedTrackStore
+import com.gpxeditor.shared.data.activity.ActivityDocumentJson
+import com.gpxeditor.shared.data.activity.ActivityGpxMapper
 import com.gpxeditor.shared.data.gpx.GpxSerializer
-import com.gpxeditor.shared.domain.gpx.GpxDocument
+import com.gpxeditor.shared.domain.activity.ActivityDocument
 import com.gpxeditor.shared.domain.imported.ImportedTrack
 import com.gpxeditor.shared.domain.imported.ports.GpxTrackFileStorage
 import com.gpxeditor.shared.feature.edittrack.DeleteGpxTrackPointRequest
@@ -173,7 +175,7 @@ class ImportScreenController(
         runCatching {
             exportGpx(
                 detail.importedTrack.displayName,
-                GpxSerializer.serialize(detail.document),
+                GpxSerializer.serialize(ActivityGpxMapper.toGpxDocument(detail.document)),
             )
         }.onSuccess {
             state = state.copy(
@@ -188,7 +190,7 @@ class ImportScreenController(
         }
     }
 
-    fun saveTrimmedTrack(document: GpxDocument) {
+    fun saveTrimmedTrack(document: ActivityDocument) {
         val detail = state.trimTrackDetail ?: return
         saveEditedDocument(
             detail = detail,
@@ -198,7 +200,7 @@ class ImportScreenController(
         )
     }
 
-    fun saveEditedTrack(document: GpxDocument) {
+    fun saveEditedTrack(document: ActivityDocument) {
         val detail = state.editTrackDetail ?: return
         saveEditedDocument(
             detail = detail,
@@ -209,7 +211,7 @@ class ImportScreenController(
     }
 
     fun deleteTrackPoint(
-        document: GpxDocument,
+        document: ActivityDocument,
         pointIndex: Int,
     ) = deleteGpxTrackPointUseCase(
         DeleteGpxTrackPointRequest(
@@ -219,7 +221,7 @@ class ImportScreenController(
     )
 
     fun moveTrackPoint(
-        document: GpxDocument,
+        document: ActivityDocument,
         pointIndex: Int,
         latitude: Double,
         longitude: Double,
@@ -234,7 +236,7 @@ class ImportScreenController(
 
     private fun saveEditedDocument(
         detail: TrackDetail,
-        document: GpxDocument,
+        document: ActivityDocument,
         closeTrim: Boolean,
         closeEdit: Boolean,
     ) {
@@ -300,7 +302,7 @@ class ImportScreenController(
     }
 
     fun trimTrack(
-        document: GpxDocument,
+        document: ActivityDocument,
         startPointIndex: Int,
         endPointIndexInclusive: Int,
     ) = trimGpxTrackUseCase(
@@ -313,7 +315,7 @@ class ImportScreenController(
 
     private suspend fun overwriteTrack(
         track: ImportedTrack,
-        document: GpxDocument,
+        document: ActivityDocument,
     ): ImportedTrack {
         val previousContent = fileStorage.read(track.storageKey)
         val updatedTrack = track.copy(
@@ -321,7 +323,7 @@ class ImportScreenController(
             pointCount = document.pointCount,
         )
 
-        fileStorage.save(track.storageKey, GpxSerializer.serialize(document))
+        fileStorage.save(track.storageKey, ActivityDocumentJson.serialize(document))
         try {
             importedTrackStore.add(updatedTrack)
         } catch (throwable: Throwable) {

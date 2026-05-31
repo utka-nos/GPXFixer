@@ -114,7 +114,7 @@ private struct SelectedPointMenu: View {
 }
 
 private struct EditableTrackMap: UIViewRepresentable {
-    let document: GpxDocument
+    let document: ActivityDocument
     @Binding var selectedPointIndex: Int?
     let isMovingPoint: Bool
     let onMapTap: (CLLocationCoordinate2D) -> Void
@@ -313,7 +313,7 @@ private struct EditableTrackMapGeometry {
     let points: [EditableTrackPoint]
     let visibleMapRect: MKMapRect
 
-    init?(document: GpxDocument) {
+    init?(document: ActivityDocument) {
         var globalPointIndex = 0
         var pointMarkers: [EditableTrackPoint] = []
         let polylines = document.tracks
@@ -324,9 +324,12 @@ private struct EditableTrackMapGeometry {
                 for point in segment.points {
                     let pointIndex = globalPointIndex
                     globalPointIndex += 1
+                    guard let latitude = point.latitude, let longitude = point.longitude else {
+                        continue
+                    }
                     let coordinate = CLLocationCoordinate2D(
-                        latitude: point.latitude,
-                        longitude: point.longitude
+                        latitude: latitude.doubleValue,
+                        longitude: longitude.doubleValue
                     )
 
                     if CLLocationCoordinate2DIsValid(coordinate) {

@@ -5,7 +5,9 @@ import com.gpxeditor.shared.domain.imported.ports.GpxTrackFileStorage
 import com.gpxeditor.shared.domain.imported.ports.ImportClock
 import com.gpxeditor.shared.domain.imported.ports.ImportIdGenerator
 import com.gpxeditor.shared.domain.imported.ports.ImportedTrackStore
-import com.gpxeditor.shared.domain.gpx.GpxDocument
+import com.gpxeditor.shared.domain.activity.ActivityDocument
+import com.gpxeditor.shared.data.activity.ActivityDocumentJson
+import com.gpxeditor.shared.data.activity.ActivityGpxMapper
 import com.gpxeditor.shared.data.gpx.GpxSerializer
 import com.gpxeditor.shared.feature.edittrack.DeleteGpxTrackPointRequest
 import com.gpxeditor.shared.feature.edittrack.DeleteGpxTrackPointResult
@@ -87,7 +89,7 @@ class IosImportFacade {
     }
 
     fun trimTrack(
-        document: GpxDocument,
+        document: ActivityDocument,
         startPointIndex: Int,
         endPointIndexInclusive: Int,
     ): TrimGpxTrackResult {
@@ -101,7 +103,7 @@ class IosImportFacade {
     }
 
     fun deleteTrackPoint(
-        document: GpxDocument,
+        document: ActivityDocument,
         pointIndex: Int,
     ): DeleteGpxTrackPointResult {
         return deleteGpxTrackPointUseCase(
@@ -113,7 +115,7 @@ class IosImportFacade {
     }
 
     fun moveTrackPoint(
-        document: GpxDocument,
+        document: ActivityDocument,
         pointIndex: Int,
         latitude: Double,
         longitude: Double,
@@ -128,13 +130,13 @@ class IosImportFacade {
         )
     }
 
-    fun serializeGpx(document: GpxDocument): String {
-        return GpxSerializer.serialize(document)
+    fun serializeGpx(document: ActivityDocument): String {
+        return GpxSerializer.serialize(ActivityGpxMapper.toGpxDocument(document))
     }
 
     fun overwriteTrack(
         track: ImportedTrack,
-        document: GpxDocument,
+        document: ActivityDocument,
     ): ImportedTrack {
         return runSuspendBlocking {
             val previousContent = fileStorage.read(track.storageKey)
@@ -143,7 +145,7 @@ class IosImportFacade {
                 pointCount = document.pointCount,
             )
 
-            fileStorage.save(track.storageKey, GpxSerializer.serialize(document))
+            fileStorage.save(track.storageKey, ActivityDocumentJson.serialize(document))
             try {
                 trackStore.add(updatedTrack)
             } catch (throwable: Throwable) {

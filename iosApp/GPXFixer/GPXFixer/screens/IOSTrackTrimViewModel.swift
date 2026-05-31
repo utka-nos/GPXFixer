@@ -6,7 +6,7 @@ import shared
 final class IOSTrackTrimViewModel: ObservableObject {
     @Published var trimStartIndex = 0
     @Published var trimEndIndex = 0
-    @Published var previewDocument: GpxDocument?
+    @Published var previewDocument: ActivityDocument?
     @Published var previewSummary: TrackSummary?
     @Published var removedPointCount = 0
     @Published var errorMessage: String?

@@ -21,7 +21,7 @@ import com.gpxeditor.android.ImportScreenState
 import com.gpxeditor.android.ImportedTrackRow
 import com.gpxeditor.android.TrackDetailScreen
 import com.gpxeditor.android.TrackTrimScreen
-import com.gpxeditor.shared.domain.gpx.GpxDocument
+import com.gpxeditor.shared.domain.activity.ActivityDocument
 import com.gpxeditor.shared.domain.imported.ImportedTrack
 import com.gpxeditor.shared.feature.edittrack.DeleteGpxTrackPointResult
 import com.gpxeditor.shared.feature.edittrack.MoveGpxTrackPointResult
@@ -37,12 +37,12 @@ fun ImportScreen(
     onEditTrack: () -> Unit,
     onExportTrack: () -> Unit,
     onBackFromTrim: () -> Unit,
-    onPreviewTrim: (GpxDocument, Int, Int) -> TrimGpxTrackResult,
-    onSaveTrimmedTrack: (GpxDocument) -> Unit,
+    onPreviewTrim: (ActivityDocument, Int, Int) -> TrimGpxTrackResult,
+    onSaveTrimmedTrack: (ActivityDocument) -> Unit,
     onBackFromEdit: () -> Unit,
-    onDeleteTrackPoint: (GpxDocument, Int) -> DeleteGpxTrackPointResult,
-    onMoveTrackPoint: (GpxDocument, Int, Double, Double) -> MoveGpxTrackPointResult,
-    onSaveEditedTrack: (GpxDocument) -> Unit,
+    onDeleteTrackPoint: (ActivityDocument, Int) -> DeleteGpxTrackPointResult,
+    onMoveTrackPoint: (ActivityDocument, Int, Double, Double) -> MoveGpxTrackPointResult,
+    onSaveEditedTrack: (ActivityDocument) -> Unit,
 ) {
     MaterialTheme {
         Surface(modifier = Modifier.fillMaxSize()) {

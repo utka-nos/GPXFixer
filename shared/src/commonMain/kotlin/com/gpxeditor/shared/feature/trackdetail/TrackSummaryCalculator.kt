@@ -1,7 +1,7 @@
 package com.gpxeditor.shared.feature.trackdetail
 
-import com.gpxeditor.shared.domain.gpx.GpxDocument
-import com.gpxeditor.shared.domain.gpx.GpxTrackPoint
+import com.gpxeditor.shared.domain.activity.ActivityDocument
+import com.gpxeditor.shared.domain.activity.ActivityPoint
 import kotlin.math.PI
 import kotlin.math.atan2
 import kotlin.math.cos
@@ -9,7 +9,7 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 
 object TrackSummaryCalculator {
-    fun summaryFor(document: GpxDocument): TrackSummary {
+    fun summaryFor(document: ActivityDocument): TrackSummary {
         val segments = document.tracks.flatMap { it.segments }
         val points = segments.flatMap { it.points }
         val elevations = points.mapNotNull { it.elevationMeters }
@@ -26,12 +26,12 @@ object TrackSummaryCalculator {
             maxElevationMeters = elevations.maxOrNull(),
             startTime = times.firstOrNull(),
             endTime = times.lastOrNull(),
-            startCoordinate = points.firstOrNull()?.toCoordinate(),
-            endCoordinate = points.lastOrNull()?.toCoordinate(),
+            startCoordinate = points.firstCoordinateOrNull(),
+            endCoordinate = points.lastCoordinateOrNull(),
         )
     }
 
-    fun segmentSummariesFor(document: GpxDocument): List<TrackSegmentSummary> {
+    fun segmentSummariesFor(document: ActivityDocument): List<TrackSegmentSummary> {
         return document.tracks
             .flatMap { it.segments }
             .mapIndexed { index, segment ->
@@ -39,15 +39,15 @@ object TrackSummaryCalculator {
                     index = index + 1,
                     pointCount = segment.points.size,
                     distanceMeters = segmentDistanceMeters(segment.points),
-                    startCoordinate = segment.points.firstOrNull()?.toCoordinate(),
-                    endCoordinate = segment.points.lastOrNull()?.toCoordinate(),
+                    startCoordinate = segment.points.firstCoordinateOrNull(),
+                    endCoordinate = segment.points.lastCoordinateOrNull(),
                     startTime = segment.points.firstNotNullOfOrNull { it.time?.takeIf(String::isNotBlank) },
                     endTime = segment.points.asReversed().firstNotNullOfOrNull { it.time?.takeIf(String::isNotBlank) },
                 )
             }
     }
 
-    fun warningsFor(document: GpxDocument): List<String> {
+    fun warningsFor(document: ActivityDocument): List<String> {
         val segments = document.tracks.flatMap { it.segments }
         val points = segments.flatMap { it.points }
         val warnings = mutableListOf<String>()
@@ -67,23 +67,22 @@ object TrackSummaryCalculator {
         if (points.isNotEmpty() && points.none { !it.time.isNullOrBlank() }) {
             warnings += "No timestamp data found."
         }
-
         return warnings
     }
 
-    private fun segmentDistanceMeters(points: List<GpxTrackPoint>): Double {
-        return points.zipWithNext().sumOf { (from, to) ->
+    private fun segmentDistanceMeters(points: List<ActivityPoint>): Double {
+        return points.filter { it.latitude != null && it.longitude != null }.zipWithNext().sumOf { (from, to) ->
             haversineMeters(
-                from.latitude,
-                from.longitude,
-                to.latitude,
-                to.longitude,
+                from.latitude ?: return@sumOf 0.0,
+                from.longitude ?: return@sumOf 0.0,
+                to.latitude ?: return@sumOf 0.0,
+                to.longitude ?: return@sumOf 0.0,
             )
         }
     }
 
     private fun elevationGain(
-        points: List<GpxTrackPoint>,
+        points: List<ActivityPoint>,
         onlyPositive: Boolean,
     ): Double? {
         if (points.none { it.elevationMeters != null }) return null
@@ -123,7 +122,17 @@ object TrackSummaryCalculator {
 
     private fun Double.toRadians(): Double = this * PI / 180.0
 
-    private fun GpxTrackPoint.toCoordinate(): GpxCoordinate {
+    private fun List<ActivityPoint>.firstCoordinateOrNull(): GpxCoordinate? {
+        return firstNotNullOfOrNull { it.toCoordinateOrNull() }
+    }
+
+    private fun List<ActivityPoint>.lastCoordinateOrNull(): GpxCoordinate? {
+        return asReversed().firstNotNullOfOrNull { it.toCoordinateOrNull() }
+    }
+
+    private fun ActivityPoint.toCoordinateOrNull(): GpxCoordinate? {
+        val latitude = latitude ?: return null
+        val longitude = longitude ?: return null
         return GpxCoordinate(latitude = latitude, longitude = longitude)
     }
 }
