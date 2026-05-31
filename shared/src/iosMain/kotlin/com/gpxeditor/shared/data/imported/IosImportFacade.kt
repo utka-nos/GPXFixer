@@ -5,6 +5,11 @@ import com.gpxeditor.shared.domain.imported.ports.GpxTrackFileStorage
 import com.gpxeditor.shared.domain.imported.ports.ImportClock
 import com.gpxeditor.shared.domain.imported.ports.ImportIdGenerator
 import com.gpxeditor.shared.domain.imported.ports.ImportedTrackStore
+import com.gpxeditor.shared.domain.gpx.GpxDocument
+import com.gpxeditor.shared.data.gpx.GpxSerializer
+import com.gpxeditor.shared.feature.edittrack.TrimGpxTrackRequest
+import com.gpxeditor.shared.feature.edittrack.TrimGpxTrackResult
+import com.gpxeditor.shared.feature.edittrack.TrimGpxTrackUseCase
 import com.gpxeditor.shared.feature.importgpx.ImportGpxTrackRequest
 import com.gpxeditor.shared.feature.importgpx.ImportGpxTrackResult
 import com.gpxeditor.shared.feature.importgpx.ImportGpxTrackUseCase
@@ -40,13 +45,16 @@ import platform.Foundation.NSJSONWritingSortedKeys
 class IosImportFacade {
     private val fileStorage = IosGpxTrackFileStorage()
     private val trackStore = IosImportedTrackStore()
+    private val idGenerator = IosImportIdGenerator()
+    private val clock = IosImportClock()
     private val importGpxTrackUseCase = ImportGpxTrackUseCase(
         fileStorage = fileStorage,
         trackStore = trackStore,
-        idGenerator = IosImportIdGenerator(),
-        clock = IosImportClock(),
+        idGenerator = idGenerator,
+        clock = clock,
     )
     private val trackDetailUseCase = TrackDetailUseCase(fileStorage)
+    private val trimGpxTrackUseCase = TrimGpxTrackUseCase()
 
     fun getImportedTracks(): List<ImportedTrack> {
         return runSuspendBlocking { trackStore.getAll() }
@@ -68,6 +76,47 @@ class IosImportFacade {
 
     fun getTrackDetail(track: ImportedTrack): TrackDetailResult {
         return runSuspendBlocking { trackDetailUseCase(track) }
+    }
+
+    fun trimTrack(
+        document: GpxDocument,
+        startPointIndex: Int,
+        endPointIndexInclusive: Int,
+    ): TrimGpxTrackResult {
+        return trimGpxTrackUseCase(
+            TrimGpxTrackRequest(
+                document = document,
+                startPointIndex = startPointIndex,
+                endPointIndexInclusive = endPointIndexInclusive,
+            ),
+        )
+    }
+
+    fun serializeGpx(document: GpxDocument): String {
+        return GpxSerializer.serialize(document)
+    }
+
+    fun overwriteTrack(
+        track: ImportedTrack,
+        document: GpxDocument,
+    ): ImportedTrack {
+        return runSuspendBlocking {
+            val previousContent = fileStorage.read(track.storageKey)
+            val updatedTrack = track.copy(
+                trackCount = document.tracks.size,
+                pointCount = document.pointCount,
+            )
+
+            fileStorage.save(track.storageKey, GpxSerializer.serialize(document))
+            try {
+                trackStore.add(updatedTrack)
+            } catch (throwable: Throwable) {
+                fileStorage.save(track.storageKey, previousContent)
+                throw throwable
+            }
+
+            updatedTrack
+        }
     }
 }
 
