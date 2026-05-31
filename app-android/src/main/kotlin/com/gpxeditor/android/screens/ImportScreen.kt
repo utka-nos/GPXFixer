@@ -1,13 +1,9 @@
-package com.gpxeditor.android.screens
+package com.gpxeditor.android
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -20,25 +16,34 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.gpxeditor.android.ImportScreenState
+import com.gpxeditor.shared.domain.gpx.GpxDocument
 import com.gpxeditor.shared.domain.imported.ImportedTrack
-import com.gpxeditor.shared.feature.trackdetail.TrackDetail
+import com.gpxeditor.shared.feature.edittrack.TrimGpxTrackResult
 
 @Composable
 fun ImportScreen(
     state: ImportScreenState,
     onImportClick: () -> Unit,
     onTrackClick: (ImportedTrack) -> Unit,
-    onMapPreviewClick: (TrackDetail) -> Unit,
-    onBackFromMap: () -> Unit,
     onBackFromDetail: () -> Unit,
+    onTrimTrack: () -> Unit,
+    onEditTrack: () -> Unit,
+    onExportTrack: () -> Unit,
+    onBackFromTrim: () -> Unit,
+    onPreviewTrim: (GpxDocument, Int, Int) -> TrimGpxTrackResult,
+    onSaveTrimmedTrack: (GpxDocument) -> Unit,
 ) {
     MaterialTheme {
         Surface(modifier = Modifier.fillMaxSize()) {
-            state.selectedTrackMapDetail?.let { detail ->
-                TrackMapFullScreen(
+            state.trimTrackDetail?.let { detail ->
+                TrackTrimScreen(
                     detail = detail,
-                    onBackClick = onBackFromMap,
+                    isSaving = state.isLoadingTrackDetail,
+                    statusMessage = state.statusMessage,
+                    errorMessage = state.errorMessage,
+                    onBackClick = onBackFromTrim,
+                    onPreviewTrim = onPreviewTrim,
+                    onSaveClick = onSaveTrimmedTrack,
                 )
                 return@Surface
             }
@@ -46,8 +51,12 @@ fun ImportScreen(
             state.selectedTrackDetail?.let { detail ->
                 TrackDetailScreen(
                     detail = detail,
-                    onMapClick = { onMapPreviewClick(detail) },
+                    statusMessage = state.statusMessage,
+                    errorMessage = state.errorMessage,
                     onBackClick = onBackFromDetail,
+                    onTrimClick = onTrimTrack,
+                    onEditClick = onEditTrack,
+                    onExportClick = onExportTrack,
                 )
                 return@Surface
             }
@@ -112,51 +121,6 @@ fun ImportScreen(
                     }
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun EmptyHistory() {
-    Spacer(modifier = Modifier.height(8.dp))
-    Text(
-        text = "No GPX tracks imported yet.",
-        style = MaterialTheme.typography.bodyLarge,
-    )
-}
-
-@Composable
-private fun ImportedTrackRow(
-    track: ImportedTrack,
-    onClick: () -> Unit,
-) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-        tonalElevation = 1.dp,
-        shape = MaterialTheme.shapes.small,
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Text(
-                text = track.displayName,
-                style = MaterialTheme.typography.titleSmall,
-            )
-            Text(
-                text = track.originalFileName,
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            Text(
-                text = "${track.trackCount} tracks / ${track.pointCount} points",
-                style = MaterialTheme.typography.bodySmall,
-            )
-            Text(
-                text = "Imported at ${track.importedAt}",
-                style = MaterialTheme.typography.bodySmall,
-            )
         }
     }
 }

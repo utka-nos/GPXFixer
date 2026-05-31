@@ -5,7 +5,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.gpxeditor.android.data.imported.JsonImportedTrackStore
+import com.gpxeditor.shared.data.gpx.GpxSerializer
+import com.gpxeditor.shared.domain.gpx.GpxDocument
 import com.gpxeditor.shared.domain.imported.ImportedTrack
+import com.gpxeditor.shared.domain.imported.ports.GpxTrackFileStorage
+import com.gpxeditor.shared.feature.edittrack.TrimGpxTrackRequest
+import com.gpxeditor.shared.feature.edittrack.TrimGpxTrackUseCase
 import com.gpxeditor.shared.feature.importgpx.ImportGpxTrackRequest
 import com.gpxeditor.shared.feature.importgpx.ImportGpxTrackResult
 import com.gpxeditor.shared.feature.importgpx.ImportGpxTrackUseCase
@@ -20,9 +25,12 @@ import kotlin.coroutines.startCoroutine
 class ImportScreenController(
     private val importGpxTrackUseCase: ImportGpxTrackUseCase,
     private val trackDetailUseCase: TrackDetailUseCase,
+    private val trimGpxTrackUseCase: TrimGpxTrackUseCase,
+    private val fileStorage: GpxTrackFileStorage,
     private val importedTrackStore: JsonImportedTrackStore,
     private val readTextFrom: (Uri) -> String,
     private val displayNameFor: (Uri) -> String?,
+    private val exportGpx: (displayName: String, content: String) -> Unit,
     private val runOnUiThread: (() -> Unit) -> Unit,
 ) {
     var state by mutableStateOf(ImportScreenState())
@@ -32,7 +40,7 @@ class ImportScreenController(
         state = state.copy(
             isImporting = true,
             selectedTrackDetail = null,
-            selectedTrackMapDetail = null,
+            trimTrackDetail = null,
             statusMessage = null,
             errorMessage = null,
         )
@@ -96,14 +104,12 @@ class ImportScreenController(
                         is TrackDetailResult.Failure -> state.copy(
                             isLoadingTrackDetail = false,
                             selectedTrackDetail = null,
-                            selectedTrackMapDetail = null,
                             errorMessage = result.error.message,
                         )
 
                         is TrackDetailResult.Success -> state.copy(
                             isLoadingTrackDetail = false,
                             selectedTrackDetail = result.detail,
-                            selectedTrackMapDetail = null,
                             errorMessage = null,
                         )
                     }
@@ -113,7 +119,6 @@ class ImportScreenController(
                     state = state.copy(
                         isLoadingTrackDetail = false,
                         selectedTrackDetail = null,
-                        selectedTrackMapDetail = null,
                         errorMessage = throwable.message ?: "Failed to open imported track",
                     )
                 }
@@ -121,20 +126,96 @@ class ImportScreenController(
         }.start()
     }
 
-    fun openTrackMap(detail: TrackDetail) {
-        state = state.copy(selectedTrackMapDetail = detail)
-    }
-
-    fun closeTrackMap() {
-        state = state.copy(selectedTrackMapDetail = null)
-    }
-
     fun closeTrackDetail() {
         state = state.copy(
             selectedTrackDetail = null,
-            selectedTrackMapDetail = null,
+            trimTrackDetail = null,
             isLoadingTrackDetail = false,
         )
+    }
+
+    fun startTrimmingTrack() {
+        val detail = state.selectedTrackDetail ?: return
+        state = state.copy(
+            trimTrackDetail = detail,
+            statusMessage = null,
+            errorMessage = null,
+        )
+    }
+
+    fun closeTrimTrack() {
+        state = state.copy(trimTrackDetail = null)
+    }
+
+    fun showEditPlaceholder() {
+        state = state.copy(
+            statusMessage = "Editing is coming soon.",
+            errorMessage = null,
+        )
+    }
+
+    fun exportTrack() {
+        val detail = state.selectedTrackDetail ?: return
+        runCatching {
+            exportGpx(
+                detail.importedTrack.displayName,
+                GpxSerializer.serialize(detail.document),
+            )
+        }.onSuccess {
+            state = state.copy(
+                statusMessage = "Exported ${detail.importedTrack.displayName}",
+                errorMessage = null,
+            )
+        }.onFailure { throwable ->
+            state = state.copy(
+                statusMessage = null,
+                errorMessage = throwable.message ?: "Failed to export GPX file",
+            )
+        }
+    }
+
+    fun saveTrimmedTrack(document: GpxDocument) {
+        val detail = state.trimTrackDetail ?: return
+        state = state.copy(
+            isLoadingTrackDetail = true,
+            statusMessage = null,
+            errorMessage = null,
+        )
+
+        Thread {
+            runCatching {
+                val updatedTrack = runSuspendBlocking {
+                    overwriteTrack(
+                        track = detail.importedTrack,
+                        document = document,
+                    )
+                }
+                val updatedDetail = detailFor(updatedTrack)
+                val history = runSuspendBlocking { importedTrackStore.getAll() }
+
+                updatedTrack to (updatedDetail to history)
+            }.onSuccess { (updatedTrack, detailAndHistory) ->
+                val (updatedDetail, history) = detailAndHistory
+                runOnUiThread {
+                    state = state.copy(
+                        tracks = history,
+                        isLoadingTrackDetail = false,
+                        selectedTrackDetail = updatedDetail,
+                        trimTrackDetail = null,
+                        statusMessage = "Saved ${updatedTrack.displayName}",
+                        errorMessage = null,
+                    )
+                }
+            }.onFailure { throwable ->
+                runOnUiThread {
+                    state = state.copy(
+                        isLoadingTrackDetail = false,
+                        statusMessage = null,
+                        errorMessage = throwable.message ?: "Failed to save trimmed track",
+                    )
+                }
+            }
+        }.start()
     }
 
     fun loadImportedTracks() {
@@ -153,6 +234,46 @@ class ImportScreenController(
                 }
             }
         }.start()
+    }
+
+    fun trimTrack(
+        document: GpxDocument,
+        startPointIndex: Int,
+        endPointIndexInclusive: Int,
+    ) = trimGpxTrackUseCase(
+        TrimGpxTrackRequest(
+            document = document,
+            startPointIndex = startPointIndex,
+            endPointIndexInclusive = endPointIndexInclusive,
+        ),
+    )
+
+    private suspend fun overwriteTrack(
+        track: ImportedTrack,
+        document: GpxDocument,
+    ): ImportedTrack {
+        val previousContent = fileStorage.read(track.storageKey)
+        val updatedTrack = track.copy(
+            trackCount = document.tracks.size,
+            pointCount = document.pointCount,
+        )
+
+        fileStorage.save(track.storageKey, GpxSerializer.serialize(document))
+        try {
+            importedTrackStore.add(updatedTrack)
+        } catch (throwable: Throwable) {
+            fileStorage.save(track.storageKey, previousContent)
+            throw throwable
+        }
+
+        return updatedTrack
+    }
+
+    private fun detailFor(track: ImportedTrack): TrackDetail {
+        return when (val result = runSuspendBlocking { trackDetailUseCase(track) }) {
+            is TrackDetailResult.Failure -> error(result.error.message)
+            is TrackDetailResult.Success -> result.detail
+        }
     }
 }
 

@@ -1,49 +1,48 @@
-package com.gpxeditor.android.screens
+package com.gpxeditor.android
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.google.android.gms.maps.CameraUpdateFactory
-import com.google.android.gms.maps.model.LatLng
-import com.google.android.gms.maps.model.LatLngBounds
-import com.google.maps.android.compose.GoogleMap
-import com.google.maps.android.compose.MapUiSettings
-import com.google.maps.android.compose.Polyline
-import com.google.maps.android.compose.rememberCameraPositionState
-import com.gpxeditor.shared.domain.gpx.GpxDocument
-import com.gpxeditor.shared.feature.trackdetail.GpxCoordinate
 import com.gpxeditor.shared.feature.trackdetail.TrackDetail
-import java.util.Locale
 
 @Composable
 fun TrackDetailScreen(
     detail: TrackDetail,
-    onMapClick: () -> Unit,
+    statusMessage: String?,
+    errorMessage: String?,
     onBackClick: () -> Unit,
+    onTrimClick: () -> Unit,
+    onEditClick: () -> Unit,
+    onExportClick: () -> Unit,
 ) {
-    val summary = detail.summary
+    var isMapFullScreen by remember { mutableStateOf(false) }
+
+    if (isMapFullScreen) {
+        TrackMapFullScreen(
+            document = detail.document,
+            onBackClick = { isMapFullScreen = false },
+        )
+        return
+    }
 
     Column(
         modifier = Modifier
@@ -52,9 +51,12 @@ fun TrackDetailScreen(
             .padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Button(onClick = onBackClick) {
-            Text("Back")
-        }
+        TrackDetailTopBar(
+            onBackClick = onBackClick,
+            onTrimClick = onTrimClick,
+            onEditClick = onEditClick,
+            onExportClick = onExportClick,
+        )
 
         Text(
             text = detail.importedTrack.displayName,
@@ -65,282 +67,82 @@ fun TrackDetailScreen(
             style = MaterialTheme.typography.bodyMedium,
         )
 
+        statusMessage?.let { message ->
+            Text(
+                text = message,
+                color = MaterialTheme.colorScheme.primary,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        }
+        errorMessage?.let { message ->
+            Text(
+                text = message,
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        }
+
         TrackMapSection(
-            detail = detail,
-            onClick = onMapClick,
+            document = detail.document,
+            onOpenMap = { isMapFullScreen = true },
         )
-
-        DetailSection(title = "Summary") {
-            DetailRow("Imported", detail.importedTrack.importedAt)
-            DetailRow("Tracks", summary.trackCount.toString())
-            DetailRow("Segments", summary.segmentCount.toString())
-            DetailRow("Points", summary.pointCount.toString())
-            DetailRow("Distance", formatDistance(summary.distanceMeters))
-            DetailRow("Elevation gain", formatElevation(summary.totalAscentMeters))
-            DetailRow("Elevation loss", formatElevation(summary.totalDescentMeters))
-            DetailRow("Elevation range", formatElevationRange(summary.minElevationMeters, summary.maxElevationMeters))
-            DetailRow("Time range", formatTimeRange(summary.startTime, summary.endTime))
-            DetailRow("Start", formatCoordinate(summary.startCoordinate))
-            DetailRow("Finish", formatCoordinate(summary.endCoordinate))
-        }
-
-        if (detail.warnings.isNotEmpty()) {
-            DetailSection(title = "Warnings") {
-                detail.warnings.forEach { warning ->
-                    Text(
-                        text = warning,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                }
-            }
-        }
-
-        DetailSection(title = "Segments") {
-            if (detail.segments.isEmpty()) {
-                Text(
-                    text = "No segments found.",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            } else {
-                detail.segments.forEach { segment ->
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(
-                            text = "Segment ${segment.index}",
-                            style = MaterialTheme.typography.titleSmall,
-                        )
-                        Text(
-                            text = "${segment.pointCount} points / ${formatDistance(segment.distanceMeters)}",
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                        Text(
-                            text = formatTimeRange(segment.startTime, segment.endTime),
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                    }
-                }
-            }
-        }
+        SummarySection(
+            title = "Summary",
+            importedAt = detail.importedTrack.importedAt,
+            summary = detail.summary,
+        )
+        WarningsSection(warnings = detail.warnings)
+        TrackSegmentsSection(segments = detail.segments)
     }
 }
 
 @Composable
-fun TrackMapFullScreen(
-    detail: TrackDetail,
+private fun TrackDetailTopBar(
     onBackClick: () -> Unit,
+    onTrimClick: () -> Unit,
+    onEditClick: () -> Unit,
+    onExportClick: () -> Unit,
 ) {
-    val geometry = remember(detail.document) {
-        TrackMapGeometry.from(detail.document)
-    } ?: return
+    var isActionsMenuExpanded by remember { mutableStateOf(false) }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        TrackMap(
-            geometry = geometry,
-            modifier = Modifier.fillMaxSize(),
-            gesturesEnabled = true,
-            boundsPadding = 80.dp,
-        )
-
-        Button(
-            modifier = Modifier.padding(16.dp),
-            onClick = onBackClick,
-        ) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Button(onClick = onBackClick) {
             Text("Back")
         }
-    }
-}
-
-@Composable
-private fun TrackMapSection(
-    detail: TrackDetail,
-    onClick: () -> Unit,
-) {
-    val geometry = remember(detail.document) {
-        TrackMapGeometry.from(detail.document)
-    } ?: return
-
-    DetailSection(title = "Map") {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(220.dp),
-        ) {
-            TrackMap(
-                geometry = geometry,
-                modifier = Modifier.fillMaxSize(),
-                gesturesEnabled = false,
-            )
-            // Overlay to catch clicks because GoogleMap consumes touch events
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clickable(onClick = onClick),
-            )
+        Spacer(modifier = Modifier.weight(1f))
+        Box {
+            Button(onClick = { isActionsMenuExpanded = true }) {
+                Text("Actions")
+            }
+            DropdownMenu(
+                expanded = isActionsMenuExpanded,
+                onDismissRequest = { isActionsMenuExpanded = false },
+            ) {
+                DropdownMenuItem(
+                    text = { Text("Trim track") },
+                    onClick = {
+                        isActionsMenuExpanded = false
+                        onTrimClick()
+                    },
+                )
+                DropdownMenuItem(
+                    text = { Text("Edit") },
+                    onClick = {
+                        isActionsMenuExpanded = false
+                        onEditClick()
+                    },
+                )
+                DropdownMenuItem(
+                    text = { Text("Export") },
+                    onClick = {
+                        isActionsMenuExpanded = false
+                        onExportClick()
+                    },
+                )
+            }
         }
     }
-}
-
-@Composable
-private fun TrackMap(
-    geometry: TrackMapGeometry,
-    modifier: Modifier = Modifier,
-    gesturesEnabled: Boolean,
-    boundsPadding: Dp = 48.dp,
-) {
-    val cameraPositionState = rememberCameraPositionState()
-    var mapLoaded by remember { mutableStateOf(false) }
-    val boundsPaddingPx = with(LocalDensity.current) {
-        boundsPadding.roundToPx()
-    }
-
-    LaunchedEffect(mapLoaded, geometry, boundsPaddingPx) {
-        if (!mapLoaded) return@LaunchedEffect
-
-        if (geometry.pointCount == 1) {
-            cameraPositionState.move(
-                CameraUpdateFactory.newLatLngZoom(geometry.polylines.first().first(), 15f),
-            )
-        } else {
-            cameraPositionState.move(
-                CameraUpdateFactory.newLatLngBounds(
-                    geometry.bounds,
-                    boundsPaddingPx,
-                ),
-            )
-        }
-    }
-
-    GoogleMap(
-        modifier = modifier,
-        cameraPositionState = cameraPositionState,
-        uiSettings = MapUiSettings(
-            compassEnabled = false,
-            indoorLevelPickerEnabled = false,
-            mapToolbarEnabled = false,
-            myLocationButtonEnabled = false,
-            rotationGesturesEnabled = false,
-            scrollGesturesEnabled = gesturesEnabled,
-            scrollGesturesEnabledDuringRotateOrZoom = false,
-            tiltGesturesEnabled = false,
-            zoomControlsEnabled = false,
-            zoomGesturesEnabled = gesturesEnabled,
-        ),
-        onMapLoaded = { mapLoaded = true },
-    ) {
-        geometry.polylines.forEach { points ->
-            Polyline(
-                points = points,
-                color = Color(0xFF1E88E5),
-                width = 8f,
-            )
-        }
-    }
-}
-
-private data class TrackMapGeometry(
-    val polylines: List<List<LatLng>>,
-    val bounds: LatLngBounds,
-) {
-    val pointCount: Int = polylines.sumOf { it.size }
-
-    companion object {
-        fun from(document: GpxDocument): TrackMapGeometry? {
-            val polylines = document.tracks
-                .flatMap { it.segments }
-                .map { segment ->
-                    segment.points
-                        .map { point -> LatLng(point.latitude, point.longitude) }
-                        .filter { point ->
-                            point.latitude in -90.0..90.0 && point.longitude in -180.0..180.0
-                        }
-                }
-                .filter { it.isNotEmpty() }
-
-            if (polylines.isEmpty()) return null
-
-            val boundsBuilder = LatLngBounds.builder()
-            polylines.flatten().forEach(boundsBuilder::include)
-
-            return TrackMapGeometry(
-                polylines = polylines,
-                bounds = boundsBuilder.build(),
-            )
-        }
-    }
-}
-
-@Composable
-private fun DetailSection(
-    title: String,
-    content: @Composable () -> Unit,
-) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        tonalElevation = 1.dp,
-        shape = MaterialTheme.shapes.small,
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleMedium,
-            )
-            content()
-        }
-    }
-}
-
-@Composable
-private fun DetailRow(
-    label: String,
-    value: String,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelMedium,
-        )
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodyMedium,
-        )
-    }
-}
-
-private fun formatDistance(meters: Double): String {
-    return if (meters >= 1_000.0) {
-        String.format(Locale.US, "%.2f km", meters / 1_000.0)
-    } else {
-        String.format(Locale.US, "%.0f m", meters)
-    }
-}
-
-private fun formatElevation(meters: Double?): String {
-    return meters?.let { String.format(Locale.US, "%.0f m", it) } ?: "No data"
-}
-
-private fun formatElevationRange(
-    minMeters: Double?,
-    maxMeters: Double?,
-): String {
-    if (minMeters == null || maxMeters == null) return "No data"
-    return "${formatElevation(minMeters)} to ${formatElevation(maxMeters)}"
-}
-
-private fun formatTimeRange(
-    startTime: String?,
-    endTime: String?,
-): String {
-    if (startTime == null && endTime == null) return "No data"
-    if (startTime == endTime || endTime == null) return startTime ?: "No data"
-    if (startTime == null) return endTime
-    return "$startTime to $endTime"
-}
-
-private fun formatCoordinate(coordinate: GpxCoordinate?): String {
-    return coordinate?.let {
-        String.format(Locale.US, "%.5f, %.5f", it.latitude, it.longitude)
-    } ?: "No data"
 }
