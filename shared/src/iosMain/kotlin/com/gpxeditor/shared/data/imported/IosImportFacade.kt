@@ -8,6 +8,8 @@ import com.gpxeditor.shared.domain.imported.ports.ImportedTrackStore
 import com.gpxeditor.shared.feature.importgpx.ImportGpxTrackRequest
 import com.gpxeditor.shared.feature.importgpx.ImportGpxTrackResult
 import com.gpxeditor.shared.feature.importgpx.ImportGpxTrackUseCase
+import com.gpxeditor.shared.feature.trackdetail.TrackDetailResult
+import com.gpxeditor.shared.feature.trackdetail.TrackDetailUseCase
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.EmptyCoroutineContext
@@ -36,13 +38,15 @@ import platform.Foundation.NSJSONWritingSortedKeys
 
 @OptIn(ExperimentalForeignApi::class)
 class IosImportFacade {
+    private val fileStorage = IosGpxTrackFileStorage()
     private val trackStore = IosImportedTrackStore()
     private val importGpxTrackUseCase = ImportGpxTrackUseCase(
-        fileStorage = IosGpxTrackFileStorage(),
+        fileStorage = fileStorage,
         trackStore = trackStore,
         idGenerator = IosImportIdGenerator(),
         clock = IosImportClock(),
     )
+    private val trackDetailUseCase = TrackDetailUseCase(fileStorage)
 
     fun getImportedTracks(): List<ImportedTrack> {
         return runSuspendBlocking { trackStore.getAll() }
@@ -60,6 +64,10 @@ class IosImportFacade {
                 ),
             )
         }
+    }
+
+    fun getTrackDetail(track: ImportedTrack): TrackDetailResult {
+        return runSuspendBlocking { trackDetailUseCase(track) }
     }
 }
 

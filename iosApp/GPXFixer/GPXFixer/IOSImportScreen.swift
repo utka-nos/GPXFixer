@@ -40,20 +40,24 @@ struct IOSImportScreen: View {
                             .foregroundStyle(.secondary)
                     } else {
                         ForEach(viewModel.tracks, id: \.id) { track in
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text(track.displayName)
-                                    .font(.headline)
-                                Text(track.originalFileName)
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                                Text("\(track.trackCount) tracks / \(track.pointCount) points")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                Text("Imported at \(track.importedAt)")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
+                            NavigationLink {
+                                IOSTrackDetailScreen(track: track)
+                            } label: {
+                                VStack(alignment: .leading, spacing: 6) {
+                                    Text(track.displayName)
+                                        .font(.headline)
+                                    Text(track.originalFileName)
+                                        .font(.subheadline)
+                                        .foregroundStyle(.secondary)
+                                    Text("\(track.trackCount) tracks / \(track.pointCount) points")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                    Text("Imported at \(track.importedAt)")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                                .padding(.vertical, 4)
                             }
-                            .padding(.vertical, 4)
                         }
                     }
                 }

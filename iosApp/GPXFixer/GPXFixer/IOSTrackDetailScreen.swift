@@ -1,0 +1,188 @@
+import Combine
+import Foundation
+import SwiftUI
+import shared
+
+struct IOSTrackDetailScreen: View {
+    let track: ImportedTrack
+
+    @StateObject private var viewModel = IOSTrackDetailViewModel()
+
+    var body: some View {
+        List {
+            if viewModel.isLoading {
+                ProgressView("Loading")
+            }
+
+            if let errorMessage = viewModel.errorMessage {
+                Text(errorMessage)
+                    .foregroundStyle(.red)
+            }
+
+            if let detail = viewModel.detail {
+                Section {
+                    Text(detail.importedTrack.originalFileName)
+                        .foregroundStyle(.secondary)
+                }
+
+                SummarySection(detail: detail)
+
+                if !detail.warnings.isEmpty {
+                    Section("Warnings") {
+                        ForEach(detail.warnings, id: \.self) { warning in
+                            Text(warning)
+                                .foregroundStyle(.red)
+                        }
+                    }
+                }
+
+                Section("Segments") {
+                    if detail.segments.isEmpty {
+                        Text("No segments found.")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(detail.segments, id: \.index) { segment in
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("Segment \(segment.index)")
+                                    .font(.headline)
+                                Text("\(segment.pointCount) points / \(formatDistance(segment.distanceMeters))")
+                                    .foregroundStyle(.secondary)
+                                Text(formatTimeRange(segment.startTime, segment.endTime))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .padding(.vertical, 4)
+                        }
+                    }
+                }
+            }
+        }
+        .navigationTitle(track.displayName)
+        .onAppear {
+            viewModel.load(track: track)
+        }
+    }
+}
+
+private struct SummarySection: View {
+    let detail: TrackDetail
+
+    var body: some View {
+        let summary = detail.summary
+
+        Section("Summary") {
+            DetailRow(label: "Imported", value: detail.importedTrack.importedAt)
+            DetailRow(label: "Tracks", value: "\(summary.trackCount)")
+            DetailRow(label: "Segments", value: "\(summary.segmentCount)")
+            DetailRow(label: "Points", value: "\(summary.pointCount)")
+            DetailRow(label: "Distance", value: formatDistance(summary.distanceMeters))
+            DetailRow(label: "Elevation gain", value: formatElevation(summary.totalAscentMeters))
+            DetailRow(label: "Elevation loss", value: formatElevation(summary.totalDescentMeters))
+            DetailRow(
+                label: "Elevation range",
+                value: formatElevationRange(summary.minElevationMeters, summary.maxElevationMeters)
+            )
+            DetailRow(label: "Time range", value: formatTimeRange(summary.startTime, summary.endTime))
+            DetailRow(label: "Start", value: formatCoordinate(summary.startCoordinate))
+            DetailRow(label: "Finish", value: formatCoordinate(summary.endCoordinate))
+        }
+    }
+}
+
+private struct DetailRow: View {
+    let label: String
+    let value: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text(value)
+        }
+    }
+}
+
+@MainActor
+private final class IOSTrackDetailViewModel: ObservableObject {
+    @Published var detail: TrackDetail?
+    @Published var isLoading = false
+    @Published var errorMessage: String?
+
+    private let importFacade = IosImportFacade()
+    private var loadedTrackId: String?
+
+    func load(track: ImportedTrack) {
+        guard loadedTrackId != track.id else { return }
+
+        loadedTrackId = track.id
+        isLoading = true
+        errorMessage = nil
+
+        let result = importFacade.getTrackDetail(track: track)
+        if let failure = result as? TrackDetailResultFailure {
+            detail = nil
+            errorMessage = failure.error.message
+        } else if let success = result as? TrackDetailResultSuccess {
+            detail = success.detail
+        } else {
+            detail = nil
+            errorMessage = "Failed to open imported track"
+        }
+
+        isLoading = false
+    }
+}
+
+private func formatDistance(_ meters: Double) -> String {
+    if meters >= 1_000.0 {
+        return String(format: "%.2f km", meters / 1_000.0)
+    }
+
+    return String(format: "%.0f m", meters)
+}
+
+private func formatElevation(_ meters: KotlinDouble?) -> String {
+    guard let meters else {
+        return "No data"
+    }
+
+    return String(format: "%.0f m", meters.doubleValue)
+}
+
+private func formatElevationRange(
+    _ minMeters: KotlinDouble?,
+    _ maxMeters: KotlinDouble?
+) -> String {
+    guard let minMeters, let maxMeters else {
+        return "No data"
+    }
+
+    return "\(formatElevation(minMeters)) to \(formatElevation(maxMeters))"
+}
+
+private func formatTimeRange(
+    _ startTime: String?,
+    _ endTime: String?
+) -> String {
+    switch (startTime, endTime) {
+    case (nil, nil):
+        return "No data"
+    case let (start?, nil):
+        return start
+    case let (nil, end?):
+        return end
+    case let (start?, end?) where start == end:
+        return start
+    case let (start?, end?):
+        return "\(start) to \(end)"
+    }
+}
+
+private func formatCoordinate(_ coordinate: GpxCoordinate?) -> String {
+    guard let coordinate else {
+        return "No data"
+    }
+
+    return String(format: "%.5f, %.5f", coordinate.latitude, coordinate.longitude)
+}
