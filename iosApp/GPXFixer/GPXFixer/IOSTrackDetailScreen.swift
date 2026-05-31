@@ -8,6 +8,7 @@ struct IOSTrackDetailScreen: View {
     let track: ImportedTrack
 
     @StateObject private var viewModel = IOSTrackDetailViewModel()
+    @State private var isShowingFullScreenMap = false
 
     var body: some View {
         List {
@@ -26,7 +27,9 @@ struct IOSTrackDetailScreen: View {
                         .foregroundStyle(.secondary)
                 }
 
-                TrackMapSection(detail: detail)
+                TrackMapSection(detail: detail) {
+                    isShowingFullScreenMap = true
+                }
 
                 SummarySection(detail: detail)
 
@@ -64,26 +67,76 @@ struct IOSTrackDetailScreen: View {
         .onAppear {
             viewModel.load(track: track)
         }
-    }
-}
-
-private struct TrackMapSection: View {
-    let detail: TrackDetail
-
-    var body: some View {
-        if let geometry = TrackMapGeometry(document: detail.document) {
-            Section("Map") {
-                TrackMapPreview(geometry: geometry)
-                    .frame(height: 220)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                    .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
+        .fullScreenCover(isPresented: $isShowingFullScreenMap) {
+            if let detail = viewModel.detail {
+                TrackMapFullScreen(detail: detail) {
+                    isShowingFullScreenMap = false
+                }
             }
         }
     }
 }
 
-private struct TrackMapPreview: UIViewRepresentable {
+private struct TrackMapSection: View {
+    let detail: TrackDetail
+    let onTap: () -> Void
+
+    var body: some View {
+        if let geometry = TrackMapGeometry(document: detail.document) {
+            Section("Map") {
+                ZStack {
+                    TrackMapView(
+                        geometry: geometry,
+                        isUserInteractionEnabled: false,
+                        edgePadding: UIEdgeInsets(top: 28, left: 28, bottom: 28, right: 28)
+                    )
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .onTapGesture(perform: onTap)
+                }
+                .frame(height: 220)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
+            }
+        }
+    }
+}
+
+private struct TrackMapFullScreen: View {
+    let detail: TrackDetail
+    let onDismiss: () -> Void
+
+    var body: some View {
+        if let geometry = TrackMapGeometry(document: detail.document) {
+            ZStack(alignment: .topLeading) {
+                TrackMapView(
+                    geometry: geometry,
+                    isUserInteractionEnabled: true,
+                    edgePadding: UIEdgeInsets(top: 80, left: 48, bottom: 80, right: 48)
+                )
+                .ignoresSafeArea()
+
+                Button("Back", action: onDismiss)
+                    .buttonStyle(.borderedProminent)
+                    .padding()
+            }
+        } else {
+            NavigationStack {
+                ContentUnavailableView("No map data", systemImage: "map")
+                    .toolbar {
+                        ToolbarItem(placement: .topBarLeading) {
+                            Button("Back", action: onDismiss)
+                        }
+                    }
+            }
+        }
+    }
+}
+
+private struct TrackMapView: UIViewRepresentable {
     let geometry: TrackMapGeometry
+    let isUserInteractionEnabled: Bool
+    let edgePadding: UIEdgeInsets
 
     func makeCoordinator() -> Coordinator {
         Coordinator()
@@ -92,14 +145,15 @@ private struct TrackMapPreview: UIViewRepresentable {
     func makeUIView(context: Context) -> MKMapView {
         let mapView = MKMapView()
         mapView.delegate = context.coordinator
-        mapView.isUserInteractionEnabled = false
         mapView.pointOfInterestFilter = .excludingAll
-        mapView.showsCompass = false
+        mapView.showsCompass = isUserInteractionEnabled
         mapView.showsScale = false
         return mapView
     }
 
     func updateUIView(_ mapView: MKMapView, context: Context) {
+        mapView.isUserInteractionEnabled = isUserInteractionEnabled
+        mapView.showsCompass = isUserInteractionEnabled
         mapView.removeOverlays(mapView.overlays)
 
         let overlays = geometry.polylines.map { coordinates in
@@ -108,7 +162,7 @@ private struct TrackMapPreview: UIViewRepresentable {
         mapView.addOverlays(overlays)
         mapView.setVisibleMapRect(
             geometry.visibleMapRect,
-            edgePadding: UIEdgeInsets(top: 28, left: 28, bottom: 28, right: 28),
+            edgePadding: edgePadding,
             animated: false
         )
     }
