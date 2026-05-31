@@ -11,6 +11,8 @@ import com.gpxeditor.shared.domain.imported.ImportedTrack
 import com.gpxeditor.shared.domain.imported.ports.GpxTrackFileStorage
 import com.gpxeditor.shared.feature.edittrack.DeleteGpxTrackPointRequest
 import com.gpxeditor.shared.feature.edittrack.DeleteGpxTrackPointUseCase
+import com.gpxeditor.shared.feature.edittrack.MoveGpxTrackPointRequest
+import com.gpxeditor.shared.feature.edittrack.MoveGpxTrackPointUseCase
 import com.gpxeditor.shared.feature.edittrack.TrimGpxTrackRequest
 import com.gpxeditor.shared.feature.edittrack.TrimGpxTrackUseCase
 import com.gpxeditor.shared.feature.importgpx.ImportGpxTrackRequest
@@ -29,6 +31,7 @@ class ImportScreenController(
     private val trackDetailUseCase: TrackDetailUseCase,
     private val trimGpxTrackUseCase: TrimGpxTrackUseCase,
     private val deleteGpxTrackPointUseCase: DeleteGpxTrackPointUseCase,
+    private val moveGpxTrackPointUseCase: MoveGpxTrackPointUseCase,
     private val fileStorage: GpxTrackFileStorage,
     private val importedTrackStore: JsonImportedTrackStore,
     private val readTextFrom: (Uri) -> String,
@@ -212,6 +215,20 @@ class ImportScreenController(
         DeleteGpxTrackPointRequest(
             document = document,
             pointIndex = pointIndex,
+        ),
+    )
+
+    fun moveTrackPoint(
+        document: GpxDocument,
+        pointIndex: Int,
+        latitude: Double,
+        longitude: Double,
+    ) = moveGpxTrackPointUseCase(
+        MoveGpxTrackPointRequest(
+            document = document,
+            pointIndex = pointIndex,
+            latitude = latitude,
+            longitude = longitude,
         ),
     )
 

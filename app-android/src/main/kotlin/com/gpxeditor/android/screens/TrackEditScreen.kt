@@ -35,6 +35,7 @@ import com.google.maps.android.compose.Polyline
 import com.google.maps.android.compose.rememberCameraPositionState
 import com.gpxeditor.shared.domain.gpx.GpxDocument
 import com.gpxeditor.shared.feature.edittrack.DeleteGpxTrackPointResult
+import com.gpxeditor.shared.feature.edittrack.MoveGpxTrackPointResult
 import com.gpxeditor.shared.feature.trackdetail.TrackDetail
 
 @Composable
@@ -44,10 +45,12 @@ fun TrackEditScreen(
     errorMessage: String?,
     onBackClick: () -> Unit,
     onDeletePoint: (GpxDocument, Int) -> DeleteGpxTrackPointResult,
+    onMovePoint: (GpxDocument, Int, Double, Double) -> MoveGpxTrackPointResult,
     onSaveClick: (GpxDocument) -> Unit,
 ) {
     var editedDocument by remember(detail.importedTrack.id) { mutableStateOf(detail.document) }
     var selectedPointIndex by remember(detail.importedTrack.id) { mutableStateOf<Int?>(null) }
+    var movingPointIndex by remember(detail.importedTrack.id) { mutableStateOf<Int?>(null) }
     var localErrorMessage by remember(detail.importedTrack.id) { mutableStateOf<String?>(null) }
     val geometry = remember(editedDocument) { EditableTrackMapGeometry.from(editedDocument) }
     val hasChanges = editedDocument != detail.document
@@ -71,8 +74,31 @@ fun TrackEditScreen(
                 geometry = geometry,
                 selectedPointIndex = selectedPointIndex,
                 onPointClick = { pointIndex ->
-                    selectedPointIndex = pointIndex
-                    localErrorMessage = null
+                    if (movingPointIndex == null) {
+                        selectedPointIndex = pointIndex
+                        localErrorMessage = null
+                    }
+                },
+                onMapClick = { position ->
+                    val pointIndex = movingPointIndex ?: return@EditableTrackMap
+                    when (
+                        val result = onMovePoint(
+                            editedDocument,
+                            pointIndex,
+                            position.latitude,
+                            position.longitude,
+                        )
+                    ) {
+                        is MoveGpxTrackPointResult.Failure -> {
+                            localErrorMessage = result.error.message
+                        }
+                        is MoveGpxTrackPointResult.Success -> {
+                            editedDocument = result.document
+                            selectedPointIndex = result.movedPointIndex
+                            movingPointIndex = null
+                            localErrorMessage = null
+                        }
+                    }
                 },
                 modifier = Modifier.fillMaxSize(),
             )
@@ -91,7 +117,22 @@ fun TrackEditScreen(
         val selectedPoint = selectedPointIndex?.let { index ->
             geometry?.points?.firstOrNull { it.index == index }
         }
-        if (selectedPoint != null) {
+        if (movingPointIndex != null) {
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(16.dp),
+                color = MaterialTheme.colorScheme.surface,
+                shape = MaterialTheme.shapes.medium,
+                tonalElevation = 8.dp,
+            ) {
+                Text(
+                    text = "Choose where to move the selected point",
+                    modifier = Modifier.padding(16.dp),
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+            }
+        } else if (selectedPoint != null) {
             SelectedPointMenu(
                 point = selectedPoint,
                 onDeleteClick = {
@@ -105,6 +146,10 @@ fun TrackEditScreen(
                             localErrorMessage = null
                         }
                     }
+                },
+                onMoveClick = {
+                    movingPointIndex = selectedPoint.index
+                    localErrorMessage = null
                 },
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
@@ -166,6 +211,7 @@ private fun TrackEditTopBar(
 private fun SelectedPointMenu(
     point: EditableTrackPoint,
     onDeleteClick: () -> Unit,
+    onMoveClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Surface(
@@ -191,8 +237,7 @@ private fun SelectedPointMenu(
                     Text("Delete")
                 }
                 OutlinedButton(
-                    enabled = false,
-                    onClick = {},
+                    onClick = onMoveClick,
                 ) {
                     Text("Move")
                 }
@@ -206,6 +251,7 @@ private fun EditableTrackMap(
     geometry: EditableTrackMapGeometry,
     selectedPointIndex: Int?,
     onPointClick: (Int) -> Unit,
+    onMapClick: (LatLng) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val cameraPositionState = rememberCameraPositionState()
@@ -243,6 +289,7 @@ private fun EditableTrackMap(
             zoomGesturesEnabled = true,
         ),
         onMapLoaded = { mapLoaded = true },
+        onMapClick = onMapClick,
     ) {
         geometry.polylines.forEach { points ->
             Polyline(

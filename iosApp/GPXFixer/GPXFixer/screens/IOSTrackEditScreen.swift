@@ -25,18 +25,36 @@ struct IOSTrackEditScreen: View {
             if EditableTrackMapGeometry(document: viewModel.document) != nil {
                 EditableTrackMap(
                     document: viewModel.document,
-                    selectedPointIndex: $viewModel.selectedPointIndex
+                    selectedPointIndex: $viewModel.selectedPointIndex,
+                    isMovingPoint: viewModel.movingPointIndex != nil,
+                    onMapTap: { coordinate in
+                        viewModel.moveSelectedPoint(
+                            latitude: coordinate.latitude,
+                            longitude: coordinate.longitude
+                        )
+                    }
                 )
                 .ignoresSafeArea(edges: .bottom)
             } else {
                 ContentUnavailableView("No track geometry", systemImage: "map")
             }
 
-            if let selectedPointIndex = viewModel.selectedPointIndex {
+            if viewModel.movingPointIndex != nil {
+                Text("Choose where to move the selected point")
+                    .font(.body)
+                    .padding(16)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(.regularMaterial)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .padding(16)
+            } else if let selectedPointIndex = viewModel.selectedPointIndex {
                 SelectedPointMenu(
                     pointIndex: selectedPointIndex,
                     onDelete: {
                         viewModel.deleteSelectedPoint()
+                    },
+                    onMove: {
+                        viewModel.beginMovingSelectedPoint()
                     }
                 )
                 .padding(16)
@@ -68,6 +86,7 @@ struct IOSTrackEditScreen: View {
 private struct SelectedPointMenu: View {
     let pointIndex: Int
     let onDelete: () -> Void
+    let onMove: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -83,9 +102,8 @@ private struct SelectedPointMenu: View {
                 }
                 .buttonStyle(.borderedProminent)
 
-                Button("Move") {}
+                Button("Move", action: onMove)
                     .buttonStyle(.bordered)
-                    .disabled(true)
             }
         }
         .padding(16)
@@ -98,9 +116,15 @@ private struct SelectedPointMenu: View {
 private struct EditableTrackMap: UIViewRepresentable {
     let document: GpxDocument
     @Binding var selectedPointIndex: Int?
+    let isMovingPoint: Bool
+    let onMapTap: (CLLocationCoordinate2D) -> Void
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(selectedPointIndex: $selectedPointIndex)
+        Coordinator(
+            selectedPointIndex: $selectedPointIndex,
+            isMovingPoint: isMovingPoint,
+            onMapTap: onMapTap
+        )
     }
 
     func makeUIView(context: Context) -> MKMapView {
@@ -109,11 +133,22 @@ private struct EditableTrackMap: UIViewRepresentable {
         mapView.pointOfInterestFilter = .excludingAll
         mapView.showsCompass = true
         mapView.showsScale = true
+
+        let tapRecognizer = UITapGestureRecognizer(
+            target: context.coordinator,
+            action: #selector(Coordinator.handleMapTap(_:))
+        )
+        tapRecognizer.cancelsTouchesInView = false
+        tapRecognizer.delegate = context.coordinator
+        mapView.addGestureRecognizer(tapRecognizer)
+
         return mapView
     }
 
     func updateUIView(_ mapView: MKMapView, context: Context) {
         context.coordinator.selectedPointIndex = $selectedPointIndex
+        context.coordinator.isMovingPoint = isMovingPoint
+        context.coordinator.onMapTap = onMapTap
 
         guard let geometry = EditableTrackMapGeometry(document: document) else {
             mapView.removeOverlays(mapView.overlays)
@@ -150,10 +185,28 @@ private struct EditableTrackMap: UIViewRepresentable {
 
     final class Coordinator: NSObject, MKMapViewDelegate {
         var selectedPointIndex: Binding<Int?>
+        var isMovingPoint: Bool
+        var onMapTap: (CLLocationCoordinate2D) -> Void
         var didSetInitialVisibleMapRect = false
 
-        init(selectedPointIndex: Binding<Int?>) {
+        init(
+            selectedPointIndex: Binding<Int?>,
+            isMovingPoint: Bool,
+            onMapTap: @escaping (CLLocationCoordinate2D) -> Void
+        ) {
             self.selectedPointIndex = selectedPointIndex
+            self.isMovingPoint = isMovingPoint
+            self.onMapTap = onMapTap
+        }
+
+        @objc func handleMapTap(_ recognizer: UITapGestureRecognizer) {
+            guard isMovingPoint, let mapView = recognizer.view as? MKMapView else {
+                return
+            }
+
+            let point = recognizer.location(in: mapView)
+            let coordinate = mapView.convert(point, toCoordinateFrom: mapView)
+            onMapTap(coordinate)
         }
 
         func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
@@ -193,6 +246,8 @@ private struct EditableTrackMap: UIViewRepresentable {
         }
 
         func mapView(_ mapView: MKMapView, didSelect view: MKAnnotationView) {
+            guard !isMovingPoint else { return }
+
             guard let annotation = view.annotation as? EditableTrackPointAnnotation else {
                 return
             }
@@ -200,6 +255,15 @@ private struct EditableTrackMap: UIViewRepresentable {
             selectedPointIndex.wrappedValue = annotation.pointIndex
             mapView.deselectAnnotation(annotation, animated: false)
         }
+    }
+}
+
+extension EditableTrackMap.Coordinator: UIGestureRecognizerDelegate {
+    func gestureRecognizer(
+        _ gestureRecognizer: UIGestureRecognizer,
+        shouldReceive touch: UITouch
+    ) -> Bool {
+        return !(touch.view is MKAnnotationView)
     }
 }
 

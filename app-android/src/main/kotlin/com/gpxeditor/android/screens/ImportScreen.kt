@@ -24,6 +24,7 @@ import com.gpxeditor.android.TrackTrimScreen
 import com.gpxeditor.shared.domain.gpx.GpxDocument
 import com.gpxeditor.shared.domain.imported.ImportedTrack
 import com.gpxeditor.shared.feature.edittrack.DeleteGpxTrackPointResult
+import com.gpxeditor.shared.feature.edittrack.MoveGpxTrackPointResult
 import com.gpxeditor.shared.feature.edittrack.TrimGpxTrackResult
 
 @Composable
@@ -40,6 +41,7 @@ fun ImportScreen(
     onSaveTrimmedTrack: (GpxDocument) -> Unit,
     onBackFromEdit: () -> Unit,
     onDeleteTrackPoint: (GpxDocument, Int) -> DeleteGpxTrackPointResult,
+    onMoveTrackPoint: (GpxDocument, Int, Double, Double) -> MoveGpxTrackPointResult,
     onSaveEditedTrack: (GpxDocument) -> Unit,
 ) {
     MaterialTheme {
@@ -51,6 +53,7 @@ fun ImportScreen(
                     errorMessage = state.errorMessage,
                     onBackClick = onBackFromEdit,
                     onDeletePoint = onDeleteTrackPoint,
+                    onMovePoint = onMoveTrackPoint,
                     onSaveClick = onSaveEditedTrack,
                 )
                 return@Surface

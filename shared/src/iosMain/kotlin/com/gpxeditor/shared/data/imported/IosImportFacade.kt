@@ -10,6 +10,9 @@ import com.gpxeditor.shared.data.gpx.GpxSerializer
 import com.gpxeditor.shared.feature.edittrack.DeleteGpxTrackPointRequest
 import com.gpxeditor.shared.feature.edittrack.DeleteGpxTrackPointResult
 import com.gpxeditor.shared.feature.edittrack.DeleteGpxTrackPointUseCase
+import com.gpxeditor.shared.feature.edittrack.MoveGpxTrackPointRequest
+import com.gpxeditor.shared.feature.edittrack.MoveGpxTrackPointResult
+import com.gpxeditor.shared.feature.edittrack.MoveGpxTrackPointUseCase
 import com.gpxeditor.shared.feature.edittrack.TrimGpxTrackRequest
 import com.gpxeditor.shared.feature.edittrack.TrimGpxTrackResult
 import com.gpxeditor.shared.feature.edittrack.TrimGpxTrackUseCase
@@ -59,6 +62,7 @@ class IosImportFacade {
     private val trackDetailUseCase = TrackDetailUseCase(fileStorage)
     private val trimGpxTrackUseCase = TrimGpxTrackUseCase()
     private val deleteGpxTrackPointUseCase = DeleteGpxTrackPointUseCase()
+    private val moveGpxTrackPointUseCase = MoveGpxTrackPointUseCase()
 
     fun getImportedTracks(): List<ImportedTrack> {
         return runSuspendBlocking { trackStore.getAll() }
@@ -104,6 +108,22 @@ class IosImportFacade {
             DeleteGpxTrackPointRequest(
                 document = document,
                 pointIndex = pointIndex,
+            ),
+        )
+    }
+
+    fun moveTrackPoint(
+        document: GpxDocument,
+        pointIndex: Int,
+        latitude: Double,
+        longitude: Double,
+    ): MoveGpxTrackPointResult {
+        return moveGpxTrackPointUseCase(
+            MoveGpxTrackPointRequest(
+                document = document,
+                pointIndex = pointIndex,
+                latitude = latitude,
+                longitude = longitude,
             ),
         )
     }
