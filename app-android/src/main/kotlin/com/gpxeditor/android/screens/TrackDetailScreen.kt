@@ -1,6 +1,8 @@
-package com.gpxeditor.android
+package com.gpxeditor.android.screens
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -20,6 +22,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.google.android.gms.maps.CameraUpdateFactory
@@ -37,6 +40,7 @@ import java.util.Locale
 @Composable
 fun TrackDetailScreen(
     detail: TrackDetail,
+    onMapClick: () -> Unit,
     onBackClick: () -> Unit,
 ) {
     val summary = detail.summary
@@ -61,7 +65,10 @@ fun TrackDetailScreen(
             style = MaterialTheme.typography.bodyMedium,
         )
 
-        TrackMapSection(detail = detail)
+        TrackMapSection(
+            detail = detail,
+            onClick = onMapClick,
+        )
 
         DetailSection(title = "Summary") {
             DetailRow("Imported", detail.importedTrack.importedAt)
@@ -118,31 +125,75 @@ fun TrackDetailScreen(
 }
 
 @Composable
-private fun TrackMapSection(detail: TrackDetail) {
+fun TrackMapFullScreen(
+    detail: TrackDetail,
+    onBackClick: () -> Unit,
+) {
+    val geometry = remember(detail.document) {
+        TrackMapGeometry.from(detail.document)
+    } ?: return
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        TrackMap(
+            geometry = geometry,
+            modifier = Modifier.fillMaxSize(),
+            gesturesEnabled = true,
+            boundsPadding = 80.dp,
+        )
+
+        Button(
+            modifier = Modifier.padding(16.dp),
+            onClick = onBackClick,
+        ) {
+            Text("Back")
+        }
+    }
+}
+
+@Composable
+private fun TrackMapSection(
+    detail: TrackDetail,
+    onClick: () -> Unit,
+) {
     val geometry = remember(detail.document) {
         TrackMapGeometry.from(detail.document)
     } ?: return
 
     DetailSection(title = "Map") {
-        TrackMapPreview(
-            geometry = geometry,
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(220.dp),
-        )
+        ) {
+            TrackMap(
+                geometry = geometry,
+                modifier = Modifier.fillMaxSize(),
+                gesturesEnabled = false,
+            )
+            // Overlay to catch clicks because GoogleMap consumes touch events
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clickable(onClick = onClick),
+            )
+        }
     }
 }
 
 @Composable
-private fun TrackMapPreview(
+private fun TrackMap(
     geometry: TrackMapGeometry,
     modifier: Modifier = Modifier,
+    gesturesEnabled: Boolean,
     boundsPadding: Dp = 48.dp,
 ) {
     val cameraPositionState = rememberCameraPositionState()
     var mapLoaded by remember { mutableStateOf(false) }
+    val boundsPaddingPx = with(LocalDensity.current) {
+        boundsPadding.roundToPx()
+    }
 
-    LaunchedEffect(mapLoaded, geometry) {
+    LaunchedEffect(mapLoaded, geometry, boundsPaddingPx) {
         if (!mapLoaded) return@LaunchedEffect
 
         if (geometry.pointCount == 1) {
@@ -153,7 +204,7 @@ private fun TrackMapPreview(
             cameraPositionState.move(
                 CameraUpdateFactory.newLatLngBounds(
                     geometry.bounds,
-                    boundsPadding.value.toInt(),
+                    boundsPaddingPx,
                 ),
             )
         }
@@ -168,11 +219,11 @@ private fun TrackMapPreview(
             mapToolbarEnabled = false,
             myLocationButtonEnabled = false,
             rotationGesturesEnabled = false,
-            scrollGesturesEnabled = false,
+            scrollGesturesEnabled = gesturesEnabled,
             scrollGesturesEnabledDuringRotateOrZoom = false,
             tiltGesturesEnabled = false,
             zoomControlsEnabled = false,
-            zoomGesturesEnabled = false,
+            zoomGesturesEnabled = gesturesEnabled,
         ),
         onMapLoaded = { mapLoaded = true },
     ) {

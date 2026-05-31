@@ -9,6 +9,7 @@ import com.gpxeditor.shared.domain.imported.ImportedTrack
 import com.gpxeditor.shared.feature.importgpx.ImportGpxTrackRequest
 import com.gpxeditor.shared.feature.importgpx.ImportGpxTrackResult
 import com.gpxeditor.shared.feature.importgpx.ImportGpxTrackUseCase
+import com.gpxeditor.shared.feature.trackdetail.TrackDetail
 import com.gpxeditor.shared.feature.trackdetail.TrackDetailResult
 import com.gpxeditor.shared.feature.trackdetail.TrackDetailUseCase
 import java.util.concurrent.CountDownLatch
@@ -31,6 +32,7 @@ class ImportScreenController(
         state = state.copy(
             isImporting = true,
             selectedTrackDetail = null,
+            selectedTrackMapDetail = null,
             statusMessage = null,
             errorMessage = null,
         )
@@ -94,12 +96,14 @@ class ImportScreenController(
                         is TrackDetailResult.Failure -> state.copy(
                             isLoadingTrackDetail = false,
                             selectedTrackDetail = null,
+                            selectedTrackMapDetail = null,
                             errorMessage = result.error.message,
                         )
 
                         is TrackDetailResult.Success -> state.copy(
                             isLoadingTrackDetail = false,
                             selectedTrackDetail = result.detail,
+                            selectedTrackMapDetail = null,
                             errorMessage = null,
                         )
                     }
@@ -109,6 +113,7 @@ class ImportScreenController(
                     state = state.copy(
                         isLoadingTrackDetail = false,
                         selectedTrackDetail = null,
+                        selectedTrackMapDetail = null,
                         errorMessage = throwable.message ?: "Failed to open imported track",
                     )
                 }
@@ -116,9 +121,18 @@ class ImportScreenController(
         }.start()
     }
 
+    fun openTrackMap(detail: TrackDetail) {
+        state = state.copy(selectedTrackMapDetail = detail)
+    }
+
+    fun closeTrackMap() {
+        state = state.copy(selectedTrackMapDetail = null)
+    }
+
     fun closeTrackDetail() {
         state = state.copy(
             selectedTrackDetail = null,
+            selectedTrackMapDetail = null,
             isLoadingTrackDetail = false,
         )
     }
