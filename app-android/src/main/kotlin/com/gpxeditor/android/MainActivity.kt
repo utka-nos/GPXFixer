@@ -13,6 +13,7 @@ import com.gpxeditor.android.data.imported.AndroidGpxTrackFileStorage
 import com.gpxeditor.android.data.imported.AndroidImportClock
 import com.gpxeditor.android.data.imported.AndroidImportIdGenerator
 import com.gpxeditor.android.data.imported.JsonImportedTrackStore
+import com.gpxeditor.android.screens.ImportScreen
 import com.gpxeditor.shared.feature.importgpx.ImportGpxTrackUseCase
 import com.gpxeditor.shared.feature.trackdetail.TrackDetailUseCase
 
@@ -58,6 +59,8 @@ class MainActivity : ComponentActivity() {
                     )
                 },
                 onTrackClick = importScreenController::openTrackDetail,
+                onMapPreviewClick = importScreenController::openTrackMap,
+                onBackFromMap = importScreenController::closeTrackMap,
                 onBackFromDetail = importScreenController::closeTrackDetail,
             )
         }

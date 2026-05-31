@@ -1,4 +1,4 @@
-package com.gpxeditor.android
+package com.gpxeditor.android.screens
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -20,20 +20,33 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.gpxeditor.android.ImportScreenState
 import com.gpxeditor.shared.domain.imported.ImportedTrack
+import com.gpxeditor.shared.feature.trackdetail.TrackDetail
 
 @Composable
 fun ImportScreen(
     state: ImportScreenState,
     onImportClick: () -> Unit,
     onTrackClick: (ImportedTrack) -> Unit,
+    onMapPreviewClick: (TrackDetail) -> Unit,
+    onBackFromMap: () -> Unit,
     onBackFromDetail: () -> Unit,
 ) {
     MaterialTheme {
         Surface(modifier = Modifier.fillMaxSize()) {
+            state.selectedTrackMapDetail?.let { detail ->
+                TrackMapFullScreen(
+                    detail = detail,
+                    onBackClick = onBackFromMap,
+                )
+                return@Surface
+            }
+
             state.selectedTrackDetail?.let { detail ->
                 TrackDetailScreen(
                     detail = detail,
+                    onMapClick = { onMapPreviewClick(detail) },
                     onBackClick = onBackFromDetail,
                 )
                 return@Surface
