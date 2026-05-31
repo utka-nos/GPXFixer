@@ -1,5 +1,6 @@
 import Combine
 import Foundation
+import MapKit
 import SwiftUI
 import shared
 
@@ -24,6 +25,8 @@ struct IOSTrackDetailScreen: View {
                     Text(detail.importedTrack.originalFileName)
                         .foregroundStyle(.secondary)
                 }
+
+                TrackMapSection(detail: detail)
 
                 SummarySection(detail: detail)
 
@@ -61,6 +64,110 @@ struct IOSTrackDetailScreen: View {
         .onAppear {
             viewModel.load(track: track)
         }
+    }
+}
+
+private struct TrackMapSection: View {
+    let detail: TrackDetail
+
+    var body: some View {
+        if let geometry = TrackMapGeometry(document: detail.document) {
+            Section("Map") {
+                TrackMapPreview(geometry: geometry)
+                    .frame(height: 220)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
+            }
+        }
+    }
+}
+
+private struct TrackMapPreview: UIViewRepresentable {
+    let geometry: TrackMapGeometry
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
+    func makeUIView(context: Context) -> MKMapView {
+        let mapView = MKMapView()
+        mapView.delegate = context.coordinator
+        mapView.isUserInteractionEnabled = false
+        mapView.pointOfInterestFilter = .excludingAll
+        mapView.showsCompass = false
+        mapView.showsScale = false
+        return mapView
+    }
+
+    func updateUIView(_ mapView: MKMapView, context: Context) {
+        mapView.removeOverlays(mapView.overlays)
+
+        let overlays = geometry.polylines.map { coordinates in
+            MKPolyline(coordinates: coordinates, count: coordinates.count)
+        }
+        mapView.addOverlays(overlays)
+        mapView.setVisibleMapRect(
+            geometry.visibleMapRect,
+            edgePadding: UIEdgeInsets(top: 28, left: 28, bottom: 28, right: 28),
+            animated: false
+        )
+    }
+
+    final class Coordinator: NSObject, MKMapViewDelegate {
+        func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
+            guard let polyline = overlay as? MKPolyline else {
+                return MKOverlayRenderer(overlay: overlay)
+            }
+
+            let renderer = MKPolylineRenderer(polyline: polyline)
+            renderer.strokeColor = UIColor.systemBlue
+            renderer.lineWidth = 4
+            renderer.lineJoin = .round
+            renderer.lineCap = .round
+            return renderer
+        }
+    }
+}
+
+private struct TrackMapGeometry {
+    let polylines: [[CLLocationCoordinate2D]]
+    let visibleMapRect: MKMapRect
+
+    init?(document: GpxDocument) {
+        let polylines = document.tracks
+            .flatMap(\.segments)
+            .map { segment in
+                segment.points
+                    .map { point in
+                        CLLocationCoordinate2D(
+                            latitude: point.latitude,
+                            longitude: point.longitude
+                        )
+                    }
+                    .filter(CLLocationCoordinate2DIsValid)
+            }
+            .filter { !$0.isEmpty }
+
+        guard !polylines.isEmpty else {
+            return nil
+        }
+
+        self.polylines = polylines
+
+        let mapRect = polylines
+            .flatMap { $0 }
+            .map { coordinate in
+                let point = MKMapPoint(coordinate)
+                return MKMapRect(x: point.x, y: point.y, width: 1, height: 1)
+            }
+            .reduce(MKMapRect.null) { partialResult, rect in
+                partialResult.union(rect)
+            }
+
+        visibleMapRect = mapRect.insetBy(
+            dx: -max(mapRect.width * 0.15, 1_000),
+            dy: -max(mapRect.height * 0.15, 1_000)
+        )
     }
 }
 
