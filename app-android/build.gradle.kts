@@ -1,4 +1,12 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import java.util.Properties
+
+val localProperties = Properties().apply {
+    val localPropertiesFile = rootProject.file("local.properties")
+    if (localPropertiesFile.exists()) {
+        localPropertiesFile.inputStream().use(::load)
+    }
+}
 
 plugins {
     alias(libs.plugins.kotlinAndroid)
@@ -17,6 +25,8 @@ android {
         targetSdk = 34
         versionCode = 1
         versionName = "0.1.0"
+
+        manifestPlaceholders["MAPS_API_KEY"] = localProperties.getProperty("MAPS_API_KEY", "")
     }
 
     buildFeatures {
@@ -43,6 +53,7 @@ dependencies {
     implementation(compose.foundation)
     implementation(compose.material3)
     implementation(compose.ui)
+    implementation(libs.google.maps.compose)
 
     debugImplementation(compose.uiTooling)
 }

@@ -4,10 +4,12 @@ kotlin = "2.0.21"
 compose-multiplatform = "1.7.3"
 androidx-core-ktx = "1.13.1"
 androidx-activity-compose = "1.9.3"
+google-maps-compose = "4.4.1"
 
 [libraries]
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "androidx-core-ktx" }
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidx-activity-compose" }
+google-maps-compose = { module = "com.google.maps.android:maps-compose", version.ref = "google-maps-compose" }
 
 [plugins]
 kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }

@@ -48,7 +48,8 @@ Kotlin Multiplatform приложение для импорта и будуще�
   - локальное хранение исходных GPX-файлов;
   - JSON-хранилище истории импортов;
   - экран со статусом импорта и списком импортированных треков;
-  - экран просмотра импортированного трека по нажатию на элемент списка.
+  - экран просмотра импортированного трека по нажатию на элемент списка;
+  - read-only просмотр линии трека на Google Maps.
 - iOS:
   - выбор GPX через `UIDocumentPickerViewController`;
   - импорт GPX из `.onOpenURL`;
@@ -67,9 +68,26 @@ Kotlin Multiplatform приложение для импорта и будуще�
 ./gradlew test
 ```
 
+## Google Maps API key для Android
+
+Android-карта использует Maps SDK for Android через Google Maps Compose. Ключ не
+коммитится: добавьте его локально в `local.properties` в корне проекта:
+
+```properties
+MAPS_API_KEY=your_api_key_here
+```
+
+Получить ключ можно в Google Cloud Console:
+
+1. Создать или выбрать Google Cloud project.
+2. Включить `Maps SDK for Android`.
+3. Создать API key в разделе `APIs & Services` -> `Credentials`.
+4. Ограничить ключ для Android-приложения `com.gpxeditor.android` и подписывающего
+   сертификата SHA-1.
+
 ## Что намеренно НЕ реализовано
 
-- Карта
+- Редактируемая карта
 - Редактирование трека
 - GPX export из отредактированного документа
 - Backend
