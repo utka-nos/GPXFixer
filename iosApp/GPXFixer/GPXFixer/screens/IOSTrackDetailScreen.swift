@@ -5,7 +5,6 @@ struct IOSTrackDetailScreen: View {
     let track: ImportedTrack
 
     @StateObject private var viewModel = IOSTrackDetailViewModel()
-    @State private var isEditPlaceholderPresented = false
 
     var body: some View {
         List {
@@ -44,8 +43,8 @@ struct IOSTrackDetailScreen: View {
                     onTrimSave: { updatedTrack in
                         viewModel.load(track: updatedTrack, force: true)
                     },
-                    onEdit: {
-                        isEditPlaceholderPresented = true
+                    onEditSave: { updatedTrack in
+                        viewModel.load(track: updatedTrack, force: true)
                     },
                     onExport: {
                         viewModel.exportTrack()
@@ -55,9 +54,6 @@ struct IOSTrackDetailScreen: View {
         }
         .onAppear {
             viewModel.load(track: track)
-        }
-        .alert("Editing is not available yet.", isPresented: $isEditPlaceholderPresented) {
-            Button("OK", role: .cancel) {}
         }
         .sheet(isPresented: $viewModel.isShareSheetPresented) {
             if let url = viewModel.exportURL {
@@ -70,7 +66,7 @@ struct IOSTrackDetailScreen: View {
 private struct TrackActionsMenu: View {
     let detail: TrackDetail
     let onTrimSave: (ImportedTrack) -> Void
-    let onEdit: () -> Void
+    let onEditSave: (ImportedTrack) -> Void
     let onExport: () -> Void
 
     var body: some View {
@@ -84,7 +80,12 @@ private struct TrackActionsMenu: View {
                 Label("Trim track", systemImage: "scissors")
             }
 
-            Button(action: onEdit) {
+            NavigationLink {
+                IOSTrackEditScreen(
+                    detail: detail,
+                    onSave: onEditSave
+                )
+            } label: {
                 Label("Edit", systemImage: "pencil")
             }
 

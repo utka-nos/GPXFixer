@@ -7,6 +7,9 @@ import com.gpxeditor.shared.domain.imported.ports.ImportIdGenerator
 import com.gpxeditor.shared.domain.imported.ports.ImportedTrackStore
 import com.gpxeditor.shared.domain.gpx.GpxDocument
 import com.gpxeditor.shared.data.gpx.GpxSerializer
+import com.gpxeditor.shared.feature.edittrack.DeleteGpxTrackPointRequest
+import com.gpxeditor.shared.feature.edittrack.DeleteGpxTrackPointResult
+import com.gpxeditor.shared.feature.edittrack.DeleteGpxTrackPointUseCase
 import com.gpxeditor.shared.feature.edittrack.TrimGpxTrackRequest
 import com.gpxeditor.shared.feature.edittrack.TrimGpxTrackResult
 import com.gpxeditor.shared.feature.edittrack.TrimGpxTrackUseCase
@@ -55,6 +58,7 @@ class IosImportFacade {
     )
     private val trackDetailUseCase = TrackDetailUseCase(fileStorage)
     private val trimGpxTrackUseCase = TrimGpxTrackUseCase()
+    private val deleteGpxTrackPointUseCase = DeleteGpxTrackPointUseCase()
 
     fun getImportedTracks(): List<ImportedTrack> {
         return runSuspendBlocking { trackStore.getAll() }
@@ -88,6 +92,18 @@ class IosImportFacade {
                 document = document,
                 startPointIndex = startPointIndex,
                 endPointIndexInclusive = endPointIndexInclusive,
+            ),
+        )
+    }
+
+    fun deleteTrackPoint(
+        document: GpxDocument,
+        pointIndex: Int,
+    ): DeleteGpxTrackPointResult {
+        return deleteGpxTrackPointUseCase(
+            DeleteGpxTrackPointRequest(
+                document = document,
+                pointIndex = pointIndex,
             ),
         )
     }

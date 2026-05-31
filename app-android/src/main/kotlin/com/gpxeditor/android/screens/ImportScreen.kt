@@ -1,4 +1,4 @@
-package com.gpxeditor.android
+package com.gpxeditor.android.screens
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -16,8 +16,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.gpxeditor.android.EmptyHistory
+import com.gpxeditor.android.ImportScreenState
+import com.gpxeditor.android.ImportedTrackRow
+import com.gpxeditor.android.TrackDetailScreen
+import com.gpxeditor.android.TrackTrimScreen
 import com.gpxeditor.shared.domain.gpx.GpxDocument
 import com.gpxeditor.shared.domain.imported.ImportedTrack
+import com.gpxeditor.shared.feature.edittrack.DeleteGpxTrackPointResult
 import com.gpxeditor.shared.feature.edittrack.TrimGpxTrackResult
 
 @Composable
@@ -32,9 +38,24 @@ fun ImportScreen(
     onBackFromTrim: () -> Unit,
     onPreviewTrim: (GpxDocument, Int, Int) -> TrimGpxTrackResult,
     onSaveTrimmedTrack: (GpxDocument) -> Unit,
+    onBackFromEdit: () -> Unit,
+    onDeleteTrackPoint: (GpxDocument, Int) -> DeleteGpxTrackPointResult,
+    onSaveEditedTrack: (GpxDocument) -> Unit,
 ) {
     MaterialTheme {
         Surface(modifier = Modifier.fillMaxSize()) {
+            state.editTrackDetail?.let { detail ->
+                TrackEditScreen(
+                    detail = detail,
+                    isSaving = state.isLoadingTrackDetail,
+                    errorMessage = state.errorMessage,
+                    onBackClick = onBackFromEdit,
+                    onDeletePoint = onDeleteTrackPoint,
+                    onSaveClick = onSaveEditedTrack,
+                )
+                return@Surface
+            }
+
             state.trimTrackDetail?.let { detail ->
                 TrackTrimScreen(
                     detail = detail,

@@ -9,6 +9,8 @@ import com.gpxeditor.shared.data.gpx.GpxSerializer
 import com.gpxeditor.shared.domain.gpx.GpxDocument
 import com.gpxeditor.shared.domain.imported.ImportedTrack
 import com.gpxeditor.shared.domain.imported.ports.GpxTrackFileStorage
+import com.gpxeditor.shared.feature.edittrack.DeleteGpxTrackPointRequest
+import com.gpxeditor.shared.feature.edittrack.DeleteGpxTrackPointUseCase
 import com.gpxeditor.shared.feature.edittrack.TrimGpxTrackRequest
 import com.gpxeditor.shared.feature.edittrack.TrimGpxTrackUseCase
 import com.gpxeditor.shared.feature.importgpx.ImportGpxTrackRequest
@@ -26,6 +28,7 @@ class ImportScreenController(
     private val importGpxTrackUseCase: ImportGpxTrackUseCase,
     private val trackDetailUseCase: TrackDetailUseCase,
     private val trimGpxTrackUseCase: TrimGpxTrackUseCase,
+    private val deleteGpxTrackPointUseCase: DeleteGpxTrackPointUseCase,
     private val fileStorage: GpxTrackFileStorage,
     private val importedTrackStore: JsonImportedTrackStore,
     private val readTextFrom: (Uri) -> String,
@@ -41,6 +44,7 @@ class ImportScreenController(
             isImporting = true,
             selectedTrackDetail = null,
             trimTrackDetail = null,
+            editTrackDetail = null,
             statusMessage = null,
             errorMessage = null,
         )
@@ -130,6 +134,7 @@ class ImportScreenController(
         state = state.copy(
             selectedTrackDetail = null,
             trimTrackDetail = null,
+            editTrackDetail = null,
             isLoadingTrackDetail = false,
         )
     }
@@ -147,11 +152,17 @@ class ImportScreenController(
         state = state.copy(trimTrackDetail = null)
     }
 
-    fun showEditPlaceholder() {
+    fun startEditingTrack() {
+        val detail = state.selectedTrackDetail ?: return
         state = state.copy(
-            statusMessage = "Editing is coming soon.",
+            editTrackDetail = detail,
+            statusMessage = null,
             errorMessage = null,
         )
+    }
+
+    fun closeEditTrack() {
+        state = state.copy(editTrackDetail = null)
     }
 
     fun exportTrack() {
@@ -176,6 +187,40 @@ class ImportScreenController(
 
     fun saveTrimmedTrack(document: GpxDocument) {
         val detail = state.trimTrackDetail ?: return
+        saveEditedDocument(
+            detail = detail,
+            document = document,
+            closeTrim = true,
+            closeEdit = false,
+        )
+    }
+
+    fun saveEditedTrack(document: GpxDocument) {
+        val detail = state.editTrackDetail ?: return
+        saveEditedDocument(
+            detail = detail,
+            document = document,
+            closeTrim = false,
+            closeEdit = true,
+        )
+    }
+
+    fun deleteTrackPoint(
+        document: GpxDocument,
+        pointIndex: Int,
+    ) = deleteGpxTrackPointUseCase(
+        DeleteGpxTrackPointRequest(
+            document = document,
+            pointIndex = pointIndex,
+        ),
+    )
+
+    private fun saveEditedDocument(
+        detail: TrackDetail,
+        document: GpxDocument,
+        closeTrim: Boolean,
+        closeEdit: Boolean,
+    ) {
         state = state.copy(
             isLoadingTrackDetail = true,
             statusMessage = null,
@@ -201,7 +246,8 @@ class ImportScreenController(
                         tracks = history,
                         isLoadingTrackDetail = false,
                         selectedTrackDetail = updatedDetail,
-                        trimTrackDetail = null,
+                        trimTrackDetail = if (closeTrim) null else state.trimTrackDetail,
+                        editTrackDetail = if (closeEdit) null else state.editTrackDetail,
                         statusMessage = "Saved ${updatedTrack.displayName}",
                         errorMessage = null,
                     )

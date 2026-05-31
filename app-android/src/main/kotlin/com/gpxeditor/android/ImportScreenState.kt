@@ -9,6 +9,7 @@ data class ImportScreenState(
     val isLoadingTrackDetail: Boolean = false,
     val selectedTrackDetail: TrackDetail? = null,
     val trimTrackDetail: TrackDetail? = null,
+    val editTrackDetail: TrackDetail? = null,
     val statusMessage: String? = null,
     val errorMessage: String? = null,
 )

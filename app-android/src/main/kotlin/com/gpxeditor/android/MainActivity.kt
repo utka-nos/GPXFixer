@@ -15,6 +15,8 @@ import com.gpxeditor.android.data.imported.AndroidGpxTrackFileStorage
 import com.gpxeditor.android.data.imported.AndroidImportClock
 import com.gpxeditor.android.data.imported.AndroidImportIdGenerator
 import com.gpxeditor.android.data.imported.JsonImportedTrackStore
+import com.gpxeditor.android.screens.ImportScreen
+import com.gpxeditor.shared.feature.edittrack.DeleteGpxTrackPointUseCase
 import com.gpxeditor.shared.feature.edittrack.TrimGpxTrackUseCase
 import com.gpxeditor.shared.feature.importgpx.ImportGpxTrackUseCase
 import com.gpxeditor.shared.feature.trackdetail.TrackDetailUseCase
@@ -38,6 +40,7 @@ class MainActivity : ComponentActivity() {
             ),
             trackDetailUseCase = TrackDetailUseCase(fileStorage),
             trimGpxTrackUseCase = TrimGpxTrackUseCase(),
+            deleteGpxTrackPointUseCase = DeleteGpxTrackPointUseCase(),
             fileStorage = fileStorage,
             importedTrackStore = importedTrackStore,
             readTextFrom = ::readTextFrom,
@@ -67,11 +70,14 @@ class MainActivity : ComponentActivity() {
                 onTrackClick = importScreenController::openTrackDetail,
                 onBackFromDetail = importScreenController::closeTrackDetail,
                 onTrimTrack = importScreenController::startTrimmingTrack,
-                onEditTrack = importScreenController::showEditPlaceholder,
+                onEditTrack = importScreenController::startEditingTrack,
                 onExportTrack = importScreenController::exportTrack,
                 onBackFromTrim = importScreenController::closeTrimTrack,
                 onPreviewTrim = importScreenController::trimTrack,
                 onSaveTrimmedTrack = importScreenController::saveTrimmedTrack,
+                onBackFromEdit = importScreenController::closeEditTrack,
+                onDeleteTrackPoint = importScreenController::deleteTrackPoint,
+                onSaveEditedTrack = importScreenController::saveEditedTrack,
             )
         }
 
