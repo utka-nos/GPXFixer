@@ -33,7 +33,7 @@ import com.google.maps.android.compose.Marker
 import com.google.maps.android.compose.MarkerState
 import com.google.maps.android.compose.Polyline
 import com.google.maps.android.compose.rememberCameraPositionState
-import com.gpxeditor.shared.domain.gpx.GpxDocument
+import com.gpxeditor.shared.domain.activity.ActivityDocument
 import com.gpxeditor.shared.feature.edittrack.DeleteGpxTrackPointResult
 import com.gpxeditor.shared.feature.edittrack.MoveGpxTrackPointResult
 import com.gpxeditor.shared.feature.trackdetail.TrackDetail
@@ -45,9 +45,9 @@ fun TrackEditScreen(
     isSaving: Boolean,
     errorMessage: String?,
     onBackClick: () -> Unit,
-    onDeletePoint: (GpxDocument, Int) -> DeleteGpxTrackPointResult,
-    onMovePoint: (GpxDocument, Int, Double, Double) -> MoveGpxTrackPointResult,
-    onSaveClick: (GpxDocument) -> Unit,
+    onDeletePoint: (ActivityDocument, Int) -> DeleteGpxTrackPointResult,
+    onMovePoint: (ActivityDocument, Int, Double, Double) -> MoveGpxTrackPointResult,
+    onSaveClick: (ActivityDocument) -> Unit,
 ) {
     var editedDocument by remember(detail.importedTrack.id) { mutableStateOf(detail.document) }
     var selectedPointIndex by remember(detail.importedTrack.id) { mutableStateOf<Int?>(null) }
@@ -331,7 +331,7 @@ private data class EditableTrackMapGeometry(
     val bounds: LatLngBounds,
 ) {
     companion object {
-        fun from(document: GpxDocument): EditableTrackMapGeometry? {
+        fun from(document: ActivityDocument): EditableTrackMapGeometry? {
             var globalPointIndex = 0
             val pointMarkers = mutableListOf<EditableTrackPoint>()
             val polylines = document.tracks
@@ -340,7 +340,9 @@ private data class EditableTrackMapGeometry(
                     segment.points.mapNotNull { point ->
                         val pointIndex = globalPointIndex
                         globalPointIndex += 1
-                        val position = LatLng(point.latitude, point.longitude)
+                        val latitude = point.latitude ?: return@mapNotNull null
+                        val longitude = point.longitude ?: return@mapNotNull null
+                        val position = LatLng(latitude, longitude)
                         if (!position.isValid()) return@mapNotNull null
 
                         pointMarkers += EditableTrackPoint(

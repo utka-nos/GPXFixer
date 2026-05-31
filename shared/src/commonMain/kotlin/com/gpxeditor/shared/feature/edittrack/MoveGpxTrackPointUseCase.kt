@@ -1,7 +1,7 @@
 package com.gpxeditor.shared.feature.edittrack
 
-import com.gpxeditor.shared.domain.gpx.GpxDocument
-import com.gpxeditor.shared.domain.gpx.GpxTrack
+import com.gpxeditor.shared.domain.activity.ActivityDocument
+import com.gpxeditor.shared.domain.activity.ActivityTrack
 import com.gpxeditor.shared.feature.trackdetail.TrackSummary
 import com.gpxeditor.shared.feature.trackdetail.TrackSummaryCalculator
 
@@ -35,9 +35,9 @@ class MoveGpxTrackPointUseCase {
         totalPointCount: Int,
     ): MoveGpxTrackPointError? {
         return when {
-            totalPointCount == 0 -> MoveGpxTrackPointError("Cannot move a point in an empty GPX document.")
+            totalPointCount == 0 -> MoveGpxTrackPointError("Cannot move a point in an empty activity document.")
             request.pointIndex < 0 -> MoveGpxTrackPointError("Point index must be zero or greater.")
-            request.pointIndex >= totalPointCount -> MoveGpxTrackPointError("Point index is outside the GPX document point range.")
+            request.pointIndex >= totalPointCount -> MoveGpxTrackPointError("Point index is outside the activity document point range.")
             request.latitude !in -90.0..90.0 -> MoveGpxTrackPointError("Latitude must be between -90 and 90 degrees.")
             request.longitude !in -180.0..180.0 -> MoveGpxTrackPointError("Longitude must be between -180 and 180 degrees.")
             else -> null
@@ -45,11 +45,11 @@ class MoveGpxTrackPointUseCase {
     }
 
     private fun movePointAt(
-        tracks: List<GpxTrack>,
+        tracks: List<ActivityTrack>,
         pointIndexToMove: Int,
         latitude: Double,
         longitude: Double,
-    ): List<GpxTrack> {
+    ): List<ActivityTrack> {
         var currentPointIndex = 0
 
         return tracks.map { track ->
@@ -77,7 +77,7 @@ class MoveGpxTrackPointUseCase {
 }
 
 data class MoveGpxTrackPointRequest(
-    val document: GpxDocument,
+    val document: ActivityDocument,
     val pointIndex: Int,
     val latitude: Double,
     val longitude: Double,
@@ -85,7 +85,7 @@ data class MoveGpxTrackPointRequest(
 
 sealed interface MoveGpxTrackPointResult {
     data class Success(
-        val document: GpxDocument,
+        val document: ActivityDocument,
         val summary: TrackSummary,
         val movedPointIndex: Int,
     ) : MoveGpxTrackPointResult
@@ -98,3 +98,4 @@ sealed interface MoveGpxTrackPointResult {
 data class MoveGpxTrackPointError(
     val message: String,
 )
+

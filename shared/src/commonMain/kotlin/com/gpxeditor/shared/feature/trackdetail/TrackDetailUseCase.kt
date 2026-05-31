@@ -1,35 +1,65 @@
 package com.gpxeditor.shared.feature.trackdetail
 
+import com.gpxeditor.shared.data.activity.ActivityDocumentJson
+import com.gpxeditor.shared.data.activity.ActivityGpxMapper
 import com.gpxeditor.shared.data.gpx.GpxParseError
 import com.gpxeditor.shared.data.gpx.GpxParseResult
 import com.gpxeditor.shared.data.gpx.GpxParser
-import com.gpxeditor.shared.domain.gpx.GpxDocument
+import com.gpxeditor.shared.domain.activity.ActivityDocument
 import com.gpxeditor.shared.domain.imported.ImportedTrack
-import com.gpxeditor.shared.domain.imported.ports.GpxTrackFileStorage
+import com.gpxeditor.shared.domain.imported.ports.ActivityTrackFileStorage
 
 class TrackDetailUseCase(
-    private val fileStorage: GpxTrackFileStorage,
+    private val fileStorage: ActivityTrackFileStorage,
 ) {
     suspend operator fun invoke(track: ImportedTrack): TrackDetailResult {
         val content = fileStorage.read(track.storageKey)
-        return when (val parseResult = GpxParser.parse(content)) {
-            is GpxParseResult.Failure -> TrackDetailResult.Failure(parseResult.error)
-            is GpxParseResult.Success -> TrackDetailResult.Success(
-                TrackDetail(
-                    importedTrack = track,
-                    document = parseResult.document,
-                    summary = TrackSummaryCalculator.summaryFor(parseResult.document),
-                    segments = TrackSummaryCalculator.segmentSummariesFor(parseResult.document),
-                    warnings = TrackSummaryCalculator.warningsFor(parseResult.document),
-                ),
-            )
+        val document = when (val result = parseStoredDocument(content)) {
+            is StoredDocumentParseResult.Failure -> return TrackDetailResult.Failure(result.error)
+            is StoredDocumentParseResult.Success -> result.document
+        }
+
+        return TrackDetailResult.Success(
+            TrackDetail(
+                importedTrack = track,
+                document = document,
+                summary = TrackSummaryCalculator.summaryFor(document),
+                segments = TrackSummaryCalculator.segmentSummariesFor(document),
+                warnings = TrackSummaryCalculator.warningsFor(document),
+            ),
+        )
+    }
+
+    private fun parseStoredDocument(content: String): StoredDocumentParseResult {
+        val trimmedContent = content.trimStart()
+        if (trimmedContent.startsWith("<")) {
+            return when (val parseResult = GpxParser.parse(content)) {
+                is GpxParseResult.Failure -> StoredDocumentParseResult.Failure(parseResult.error)
+                is GpxParseResult.Success -> StoredDocumentParseResult.Success(
+                    ActivityGpxMapper.fromGpxDocument(parseResult.document),
+                )
+            }
+        }
+
+        return when (val parseResult = ActivityDocumentJson.parse(content)) {
+            is com.gpxeditor.shared.data.activity.ActivityJsonParseResult.Failure -> {
+                StoredDocumentParseResult.Failure(GpxParseError(parseResult.message))
+            }
+            is com.gpxeditor.shared.data.activity.ActivityJsonParseResult.Success -> {
+                StoredDocumentParseResult.Success(parseResult.document)
+            }
         }
     }
 }
 
+private sealed interface StoredDocumentParseResult {
+    data class Success(val document: ActivityDocument) : StoredDocumentParseResult
+    data class Failure(val error: GpxParseError) : StoredDocumentParseResult
+}
+
 data class TrackDetail(
     val importedTrack: ImportedTrack,
-    val document: GpxDocument,
+    val document: ActivityDocument,
     val summary: TrackSummary,
     val segments: List<TrackSegmentSummary>,
     val warnings: List<String>,

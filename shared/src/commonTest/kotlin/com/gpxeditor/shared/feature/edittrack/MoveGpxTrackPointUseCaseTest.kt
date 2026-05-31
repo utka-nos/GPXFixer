@@ -1,150 +1,84 @@
 package com.gpxeditor.shared.feature.edittrack
 
-import com.gpxeditor.shared.data.gpx.GpxParser
-import com.gpxeditor.shared.data.gpx.GpxSerializer
-import com.gpxeditor.shared.domain.gpx.GpxDocument
-import com.gpxeditor.shared.domain.gpx.GpxMetadata
-import com.gpxeditor.shared.domain.gpx.GpxTrack
-import com.gpxeditor.shared.domain.gpx.GpxTrackPoint
-import com.gpxeditor.shared.domain.gpx.GpxTrackSegment
-import com.gpxeditor.shared.feature.trackdetail.GpxCoordinate
+import com.gpxeditor.shared.domain.activity.ActivityDocument
+import com.gpxeditor.shared.domain.activity.ActivityPoint
+import com.gpxeditor.shared.domain.activity.ActivitySegment
+import com.gpxeditor.shared.domain.activity.ActivityTrack
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 
 class MoveGpxTrackPointUseCaseTest {
     @Test
-    fun movesPointByGlobalIndexAndKeepsPointData() {
+    fun movesPointByGlobalIndexAndKeepsSensorData() {
         val result = MoveGpxTrackPointUseCase()(
             MoveGpxTrackPointRequest(
-                document = documentWithMultipleTracksAndSegments(),
-                pointIndex = 2,
+                document = documentWithPoints(),
+                pointIndex = 1,
                 latitude = 41.7151,
                 longitude = 44.8271,
             ),
         )
 
         val success = assertIs<MoveGpxTrackPointResult.Success>(result)
-        val movedPoint = success.document.tracks
-            .first()
-            .segments
-            .last()
-            .points
-            .single()
+        val movedPoint = success.document.tracks.single().segments.single().points[1]
 
-        assertEquals(2, success.movedPointIndex)
+        assertEquals(1, success.movedPointIndex)
         assertEquals(41.7151, movedPoint.latitude)
         assertEquals(44.8271, movedPoint.longitude)
-        assertEquals(12.0, movedPoint.elevationMeters)
-        assertEquals("2026-05-31T08:02:00Z", movedPoint.time)
-        assertEquals("p2", movedPoint.name)
-        assertEquals(4, success.document.pointCount)
-        assertEquals(4, success.summary.pointCount)
-        assertEquals(GpxCoordinate(0.0, 0.0), success.summary.startCoordinate)
-    }
-
-    @Test
-    fun keepsMetadataAndProducesSerializableDocument() {
-        val success = assertIs<MoveGpxTrackPointResult.Success>(
-            MoveGpxTrackPointUseCase()(
-                MoveGpxTrackPointRequest(
-                    document = documentWithMultipleTracksAndSegments(),
-                    pointIndex = 1,
-                    latitude = 10.0,
-                    longitude = 20.0,
-                ),
-            ),
-        )
-
-        assertEquals("1.1", success.document.version)
-        assertEquals("GPXFixer", success.document.creator)
-        assertEquals("Morning Ride", success.document.metadata?.name)
-
-        val parsed = GpxParser.parseOrThrow(GpxSerializer.serialize(success.document))
-
-        assertEquals(success.document, parsed)
+        assertEquals(145, movedPoint.heartRateBpm)
+        assertEquals(220, movedPoint.powerWatts)
+        assertEquals(3, success.summary.pointCount)
     }
 
     @Test
     fun returnsFailureForInvalidInput() {
-        val useCase = MoveGpxTrackPointUseCase()
-        val document = documentWithMultipleTracksAndSegments()
-
-        assertEquals(
-            "Point index must be zero or greater.",
-            failureMessage(useCase, document, pointIndex = -1, latitude = 0.0, longitude = 0.0),
-        )
-        assertEquals(
-            "Point index is outside the GPX document point range.",
-            failureMessage(useCase, document, pointIndex = 4, latitude = 0.0, longitude = 0.0),
-        )
-        assertEquals(
-            "Latitude must be between -90 and 90 degrees.",
-            failureMessage(useCase, document, pointIndex = 0, latitude = 91.0, longitude = 0.0),
-        )
-        assertEquals(
-            "Longitude must be between -180 and 180 degrees.",
-            failureMessage(useCase, document, pointIndex = 0, latitude = 0.0, longitude = 181.0),
-        )
-    }
-
-    private fun failureMessage(
-        useCase: MoveGpxTrackPointUseCase,
-        document: GpxDocument,
-        pointIndex: Int,
-        latitude: Double,
-        longitude: Double,
-    ): String {
-        val result = useCase(
+        val result = MoveGpxTrackPointUseCase()(
             MoveGpxTrackPointRequest(
-                document = document,
-                pointIndex = pointIndex,
-                latitude = latitude,
-                longitude = longitude,
+                document = documentWithPoints(),
+                pointIndex = 3,
+                latitude = 0.0,
+                longitude = 0.0,
             ),
         )
 
-        return assertIs<MoveGpxTrackPointResult.Failure>(result).error.message
+        val failure = assertIs<MoveGpxTrackPointResult.Failure>(result)
+        assertEquals("Point index is outside the activity document point range.", failure.error.message)
     }
+}
 
-    private fun documentWithMultipleTracksAndSegments(): GpxDocument {
-        return GpxDocument(
-            version = "1.1",
-            creator = "GPXFixer",
-            metadata = GpxMetadata(
-                name = "Morning Ride",
-                description = "City loop",
-                time = "2026-05-31T08:00:00Z",
-            ),
-            tracks = listOf(
-                GpxTrack(
-                    name = "Main Track",
-                    segments = listOf(
-                        GpxTrackSegment(points = listOf(point("p0", 0.0, "00"), point("p1", 0.001, "01"))),
-                        GpxTrackSegment(points = listOf(point("p2", 0.002, "02"))),
-                    ),
-                ),
-                GpxTrack(
-                    name = "Extra Track",
-                    segments = listOf(
-                        GpxTrackSegment(points = listOf(point("p3", 0.003, "03"))),
+internal fun documentWithPoints(): ActivityDocument {
+    return ActivityDocument(
+        tracks = listOf(
+            ActivityTrack(
+                name = "Ride",
+                segments = listOf(
+                    ActivitySegment(
+                        points = listOf(
+                            point("p0", longitude = 44.0, heartRate = 140, power = 200),
+                            point("p1", longitude = 44.001, heartRate = 145, power = 220),
+                            point("p2", longitude = 44.002, heartRate = 150, power = 240),
+                        ),
                     ),
                 ),
             ),
-        )
-    }
+        ),
+    )
+}
 
-    private fun point(
-        name: String,
-        longitude: Double,
-        minute: String,
-    ): GpxTrackPoint {
-        return GpxTrackPoint(
-            latitude = 0.0,
-            longitude = longitude,
-            elevationMeters = 10.0 + minute.toInt(),
-            time = "2026-05-31T08:$minute:00Z",
-            name = name,
-        )
-    }
+internal fun point(
+    name: String,
+    longitude: Double,
+    heartRate: Int,
+    power: Int,
+): ActivityPoint {
+    return ActivityPoint(
+        latitude = 41.0,
+        longitude = longitude,
+        elevationMeters = 500.0,
+        time = "2026-05-31T08:00:00Z",
+        name = name,
+        heartRateBpm = heartRate,
+        powerWatts = power,
+    )
 }

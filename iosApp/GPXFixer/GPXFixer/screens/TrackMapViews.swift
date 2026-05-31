@@ -3,7 +3,7 @@ import SwiftUI
 import shared
 
 struct TrackMapSection: View {
-    let document: GpxDocument
+    let document: ActivityDocument
 
     var body: some View {
         if let geometry = TrackMapGeometry(document: document) {
@@ -23,7 +23,7 @@ struct TrackMapSection: View {
 }
 
 private struct TrackMapFullScreen: View {
-    let document: GpxDocument
+    let document: ActivityDocument
 
     var body: some View {
         if let geometry = TrackMapGeometry(document: document) {
@@ -95,15 +95,18 @@ private struct TrackMapGeometry {
     let polylines: [[CLLocationCoordinate2D]]
     let visibleMapRect: MKMapRect
 
-    init?(document: GpxDocument) {
+    init?(document: ActivityDocument) {
         let polylines = document.tracks
             .flatMap(\.segments)
             .map { segment in
                 segment.points
-                    .map { point in
-                        CLLocationCoordinate2D(
-                            latitude: point.latitude,
-                            longitude: point.longitude
+                    .compactMap { point in
+                        guard let latitude = point.latitude, let longitude = point.longitude else {
+                            return nil
+                        }
+                        return CLLocationCoordinate2D(
+                            latitude: latitude.doubleValue,
+                            longitude: longitude.doubleValue
                         )
                     }
                     .filter(CLLocationCoordinate2DIsValid)

@@ -1,5 +1,6 @@
 package com.gpxeditor.shared.feature.importgpx
 
+import com.gpxeditor.shared.data.activity.ActivityDocumentJson
 import com.gpxeditor.shared.domain.imported.ImportedTrack
 import com.gpxeditor.shared.domain.imported.ports.GpxTrackFileStorage
 import com.gpxeditor.shared.domain.imported.ports.ImportClock
@@ -53,10 +54,15 @@ class ImportGpxTrackUseCaseTest {
         assertEquals("Evening Route", success.importedTrack.displayName)
         assertEquals("route.gpx", success.importedTrack.originalFileName)
         assertEquals("2026-05-31T10:00:00Z", success.importedTrack.importedAt)
-        assertEquals("tracks/track-1.gpx", success.importedTrack.storageKey)
+        assertEquals("tracks/track-1.activity.json", success.importedTrack.storageKey)
         assertEquals(1, success.importedTrack.trackCount)
         assertEquals(2, success.importedTrack.pointCount)
-        assertEquals(content, fileStorage.savedContent("tracks/track-1.gpx"))
+        val savedDocument = ActivityDocumentJson.parseOrThrow(
+            fileStorage.savedContent("tracks/track-1.activity.json") ?: "",
+        )
+        assertEquals("Evening Route", savedDocument.metadata.name)
+        assertEquals("GPXFixer", savedDocument.metadata.source)
+        assertEquals(2, savedDocument.pointCount)
         assertEquals(listOf(success.importedTrack), trackStore.tracks)
     }
 
@@ -106,7 +112,7 @@ class ImportGpxTrackUseCaseTest {
             }
         }
 
-        assertNull(fileStorage.savedContent("tracks/track-1.gpx"))
+        assertNull(fileStorage.savedContent("tracks/track-1.activity.json"))
         assertTrue(trackStore.tracks.isEmpty())
     }
 

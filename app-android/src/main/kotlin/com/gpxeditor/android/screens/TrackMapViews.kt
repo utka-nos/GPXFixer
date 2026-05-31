@@ -28,11 +28,11 @@ import com.google.maps.android.compose.GoogleMap
 import com.google.maps.android.compose.MapUiSettings
 import com.google.maps.android.compose.Polyline
 import com.google.maps.android.compose.rememberCameraPositionState
-import com.gpxeditor.shared.domain.gpx.GpxDocument
+import com.gpxeditor.shared.domain.activity.ActivityDocument
 
 @Composable
 fun TrackMapSection(
-    document: GpxDocument,
+    document: ActivityDocument,
     onOpenMap: (() -> Unit)? = null,
 ) {
     val geometry = remember(document) {
@@ -62,7 +62,7 @@ fun TrackMapSection(
 
 @Composable
 fun TrackMapFullScreen(
-    document: GpxDocument,
+    document: ActivityDocument,
     onBackClick: () -> Unit,
 ) {
     val geometry = remember(document) {
@@ -157,12 +157,16 @@ private data class TrackMapGeometry(
     val pointCount: Int = polylines.sumOf { it.size }
 
     companion object {
-        fun from(document: GpxDocument): TrackMapGeometry? {
+        fun from(document: ActivityDocument): TrackMapGeometry? {
             val polylines = document.tracks
                 .flatMap { it.segments }
                 .map { segment ->
                     segment.points
-                        .map { point -> LatLng(point.latitude, point.longitude) }
+                        .mapNotNull { point ->
+                            val latitude = point.latitude ?: return@mapNotNull null
+                            val longitude = point.longitude ?: return@mapNotNull null
+                            LatLng(latitude, longitude)
+                        }
                         .filter { point ->
                             point.latitude in -90.0..90.0 && point.longitude in -180.0..180.0
                         }

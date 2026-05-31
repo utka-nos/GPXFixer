@@ -45,7 +45,7 @@ class TrackDetailUseCaseTest {
         val result = useCase(importedTrack())
 
         val detail = assertIs<TrackDetailResult.Success>(result).detail
-        assertEquals("Morning Ride", detail.document.metadata?.name)
+        assertEquals("Morning Ride", detail.document.metadata.name)
         assertEquals(1, detail.summary.trackCount)
         assertEquals(1, detail.summary.segmentCount)
         assertEquals(3, detail.summary.pointCount)

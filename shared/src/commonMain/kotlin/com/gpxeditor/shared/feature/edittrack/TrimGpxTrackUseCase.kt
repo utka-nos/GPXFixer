@@ -1,9 +1,9 @@
 package com.gpxeditor.shared.feature.edittrack
 
-import com.gpxeditor.shared.domain.gpx.GpxDocument
-import com.gpxeditor.shared.domain.gpx.GpxTrack
-import com.gpxeditor.shared.domain.gpx.GpxTrackPoint
-import com.gpxeditor.shared.domain.gpx.GpxTrackSegment
+import com.gpxeditor.shared.domain.activity.ActivityDocument
+import com.gpxeditor.shared.domain.activity.ActivityPoint
+import com.gpxeditor.shared.domain.activity.ActivitySegment
+import com.gpxeditor.shared.domain.activity.ActivityTrack
 import com.gpxeditor.shared.feature.trackdetail.TrackSummary
 import com.gpxeditor.shared.feature.trackdetail.TrackSummaryCalculator
 
@@ -36,23 +36,23 @@ class TrimGpxTrackUseCase {
         totalPointCount: Int,
     ): TrimGpxTrackError? {
         return when {
-            totalPointCount == 0 -> TrimGpxTrackError("Cannot trim GPX document without track points.")
+            totalPointCount == 0 -> TrimGpxTrackError("Cannot trim activity document without track points.")
             request.startPointIndex < 0 -> TrimGpxTrackError("Start point index must be zero or greater.")
             request.endPointIndexInclusive < request.startPointIndex -> {
                 TrimGpxTrackError("End point index must be greater than or equal to start point index.")
             }
             request.endPointIndexInclusive >= totalPointCount -> {
-                TrimGpxTrackError("End point index is outside the GPX document point range.")
+                TrimGpxTrackError("End point index is outside the activity document point range.")
             }
             else -> null
         }
     }
 
     private fun trimTracks(
-        tracks: List<GpxTrack>,
+        tracks: List<ActivityTrack>,
         startPointIndex: Int,
         endPointIndexInclusive: Int,
-    ): List<GpxTrack> {
+    ): List<ActivityTrack> {
         var currentPointIndex = 0
 
         return tracks.mapNotNull { track ->
@@ -74,7 +74,7 @@ class TrimGpxTrackUseCase {
         }
     }
 
-    private fun GpxTrackSegment.withPointsOrNull(points: List<GpxTrackPoint>): GpxTrackSegment? {
+    private fun ActivitySegment.withPointsOrNull(points: List<ActivityPoint>): ActivitySegment? {
         return if (points.isEmpty()) {
             null
         } else {
@@ -84,14 +84,14 @@ class TrimGpxTrackUseCase {
 }
 
 data class TrimGpxTrackRequest(
-    val document: GpxDocument,
+    val document: ActivityDocument,
     val startPointIndex: Int,
     val endPointIndexInclusive: Int,
 )
 
 sealed interface TrimGpxTrackResult {
     data class Success(
-        val document: GpxDocument,
+        val document: ActivityDocument,
         val summary: TrackSummary,
         val removedPointCount: Int,
     ) : TrimGpxTrackResult
@@ -104,3 +104,4 @@ sealed interface TrimGpxTrackResult {
 data class TrimGpxTrackError(
     val message: String,
 )
+
