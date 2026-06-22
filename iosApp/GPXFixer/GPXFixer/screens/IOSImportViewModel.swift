@@ -16,14 +16,14 @@ final class IOSImportViewModel: ObservableObject {
         tracks = importFacade.getImportedTracks()
     }
 
-    func importGpx(from url: URL) {
+    func importTrack(from url: URL) {
         isImporting = true
         statusMessage = nil
         errorMessage = nil
 
         Task {
             do {
-                let importedTrack = try importTrack(from: url)
+                let importedTrack = try decodeTrack(from: url)
                 tracks = importFacade.getImportedTracks()
                 statusMessage = "Imported \(importedTrack.displayName)"
             } catch {
@@ -34,7 +34,7 @@ final class IOSImportViewModel: ObservableObject {
         }
     }
 
-    private func importTrack(from url: URL) throws -> ImportedTrack {
+    private func decodeTrack(from url: URL) throws -> ImportedTrack {
         let shouldStopAccessing = url.startAccessingSecurityScopedResource()
         defer {
             if shouldStopAccessing {
@@ -42,6 +42,13 @@ final class IOSImportViewModel: ObservableObject {
             }
         }
 
+        if url.pathExtension.lowercased() == "fit" {
+            return try importFit(from: url)
+        }
+        return try importGpx(from: url)
+    }
+
+    private func importGpx(from url: URL) throws -> ImportedTrack {
         let content = try String(contentsOf: url, encoding: .utf8)
         let result = importFacade.importGpx(
             originalFileName: url.lastPathComponent,
@@ -49,13 +56,31 @@ final class IOSImportViewModel: ObservableObject {
         )
 
         if let failure = result as? ImportGpxTrackResultFailure {
-            throw IOSImportError.invalidGpx(failure.error.message)
+            throw IOSImportError.invalidTrack(failure.error.message)
         }
 
         if let success = result as? ImportGpxTrackResultSuccess {
             return success.importedTrack
         }
 
-        throw IOSImportError.invalidGpx("Failed to import GPX file")
+        throw IOSImportError.invalidTrack("Failed to import GPX file")
+    }
+
+    private func importFit(from url: URL) throws -> ImportedTrack {
+        let data = try Data(contentsOf: url)
+        let result = importFacade.importFit(
+            originalFileName: url.lastPathComponent,
+            content: data
+        )
+
+        if let failure = result as? ImportFitTrackResultFailure {
+            throw IOSImportError.invalidTrack(failure.error.message)
+        }
+
+        if let success = result as? ImportFitTrackResultSuccess {
+            return success.importedTrack
+        }
+
+        throw IOSImportError.invalidTrack("Failed to import FIT file")
     }
 }

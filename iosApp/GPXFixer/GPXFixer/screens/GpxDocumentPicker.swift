@@ -22,8 +22,9 @@ private struct GpxDocumentPicker: UIViewControllerRepresentable {
 
     func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
         let gpxType = UTType(filenameExtension: "gpx") ?? .xml
+        let fitType = UTType(filenameExtension: "fit") ?? .data
         let picker = UIDocumentPickerViewController(
-            forOpeningContentTypes: [gpxType, .xml, .data],
+            forOpeningContentTypes: [gpxType, fitType, .xml, .data],
             asCopy: true
         )
         picker.allowsMultipleSelection = false
