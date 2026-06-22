@@ -12,7 +12,7 @@ struct IOSImportScreen: View {
                     Button {
                         isShowingImporter = true
                     } label: {
-                        Label("Import GPX", systemImage: "square.and.arrow.down")
+                        Label("Import track", systemImage: "square.and.arrow.down")
                     }
                     .disabled(viewModel.isImporting)
 
@@ -33,7 +33,7 @@ struct IOSImportScreen: View {
 
                 Section("Imported tracks") {
                     if viewModel.tracks.isEmpty {
-                        Text("No GPX tracks imported yet.")
+                        Text("No tracks imported yet.")
                             .foregroundStyle(.secondary)
                     } else {
                         ForEach(viewModel.tracks, id: \.id) { track in
@@ -48,10 +48,10 @@ struct IOSImportScreen: View {
             }
             .navigationTitle("GPXFixer")
             .fileImporterSheet(isPresented: $isShowingImporter) { url in
-                viewModel.importGpx(from: url)
+                viewModel.importTrack(from: url)
             }
             .onOpenURL { url in
-                viewModel.importGpx(from: url)
+                viewModel.importTrack(from: url)
             }
             .onAppear {
                 viewModel.loadHistory()

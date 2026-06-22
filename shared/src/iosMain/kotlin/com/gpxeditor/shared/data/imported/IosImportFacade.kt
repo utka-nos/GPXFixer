@@ -8,6 +8,7 @@ import com.gpxeditor.shared.domain.imported.ports.ImportedTrackStore
 import com.gpxeditor.shared.domain.activity.ActivityDocument
 import com.gpxeditor.shared.data.activity.ActivityDocumentJson
 import com.gpxeditor.shared.data.activity.ActivityGpxMapper
+import com.gpxeditor.shared.data.fit.FitActivityDecoder
 import com.gpxeditor.shared.data.gpx.GpxSerializer
 import com.gpxeditor.shared.feature.edittrack.DeleteGpxTrackPointRequest
 import com.gpxeditor.shared.feature.edittrack.DeleteGpxTrackPointResult
@@ -18,12 +19,19 @@ import com.gpxeditor.shared.feature.edittrack.MoveGpxTrackPointUseCase
 import com.gpxeditor.shared.feature.edittrack.TrimGpxTrackRequest
 import com.gpxeditor.shared.feature.edittrack.TrimGpxTrackResult
 import com.gpxeditor.shared.feature.edittrack.TrimGpxTrackUseCase
+import com.gpxeditor.shared.feature.exportfit.ExportFitTrackUseCase
+import com.gpxeditor.shared.feature.importfit.ImportFitTrackRequest
+import com.gpxeditor.shared.feature.importfit.ImportFitTrackResult
+import com.gpxeditor.shared.feature.importfit.ImportFitTrackUseCase
 import com.gpxeditor.shared.feature.importgpx.ImportGpxTrackRequest
 import com.gpxeditor.shared.feature.importgpx.ImportGpxTrackResult
 import com.gpxeditor.shared.feature.importgpx.ImportGpxTrackUseCase
 import com.gpxeditor.shared.feature.trackdetail.TrackDetailResult
 import com.gpxeditor.shared.feature.trackdetail.TrackDetailUseCase
 import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.addressOf
+import kotlinx.cinterop.usePinned
+import platform.posix.memcpy
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.coroutines.startCoroutine
@@ -35,7 +43,9 @@ import platform.Foundation.NSFileManager
 import platform.Foundation.NSISO8601DateFormatter
 import platform.Foundation.NSJSONSerialization
 import platform.Foundation.NSMutableArray
+import platform.Foundation.NSMutableData
 import platform.Foundation.NSMutableDictionary
+import platform.Foundation.appendBytes
 import platform.Foundation.NSNumber
 import platform.Foundation.NSString
 import platform.Foundation.NSURL
@@ -61,6 +71,14 @@ class IosImportFacade {
         idGenerator = idGenerator,
         clock = clock,
     )
+    private val importFitTrackUseCase = ImportFitTrackUseCase(
+        fitFileDecoder = FitActivityDecoder(),
+        fileStorage = fileStorage,
+        trackStore = trackStore,
+        idGenerator = idGenerator,
+        clock = clock,
+    )
+    private val exportFitTrackUseCase = ExportFitTrackUseCase(fileStorage)
     private val trackDetailUseCase = TrackDetailUseCase(fileStorage)
     private val trimGpxTrackUseCase = TrimGpxTrackUseCase()
     private val deleteGpxTrackPointUseCase = DeleteGpxTrackPointUseCase()
@@ -79,6 +97,20 @@ class IosImportFacade {
                 ImportGpxTrackRequest(
                     originalFileName = originalFileName,
                     content = content,
+                ),
+            )
+        }
+    }
+
+    fun importFit(
+        originalFileName: String,
+        content: NSData,
+    ): ImportFitTrackResult {
+        return runSuspendBlocking {
+            importFitTrackUseCase(
+                ImportFitTrackRequest(
+                    originalFileName = originalFileName,
+                    content = content.toByteArray(),
                 ),
             )
         }
@@ -132,6 +164,10 @@ class IosImportFacade {
 
     fun serializeGpx(document: ActivityDocument): String {
         return GpxSerializer.serialize(ActivityGpxMapper.toGpxDocument(document))
+    }
+
+    fun serializeFit(track: ImportedTrack, document: ActivityDocument): NSData {
+        return runSuspendBlocking { exportFitTrackUseCase.encode(track, document) }.toNSData()
     }
 
     fun overwriteTrack(
@@ -313,6 +349,29 @@ private class IosImportClock : ImportClock {
     override fun nowIsoString(): String {
         return formatter.stringFromDate(NSDate())
     }
+}
+
+@OptIn(ExperimentalForeignApi::class)
+private fun NSData.toByteArray(): ByteArray {
+    val size = length.toInt()
+    val result = ByteArray(size)
+    if (size > 0) {
+        result.usePinned { pinned ->
+            memcpy(pinned.addressOf(0), bytes, length)
+        }
+    }
+    return result
+}
+
+@OptIn(ExperimentalForeignApi::class)
+private fun ByteArray.toNSData(): NSData {
+    val data = NSMutableData()
+    if (isNotEmpty()) {
+        usePinned { pinned ->
+            data.appendBytes(pinned.addressOf(0), size.toULong())
+        }
+    }
+    return data
 }
 
 @OptIn(ExperimentalForeignApi::class)

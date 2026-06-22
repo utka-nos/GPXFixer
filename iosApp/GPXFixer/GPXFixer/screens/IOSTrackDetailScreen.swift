@@ -46,8 +46,11 @@ struct IOSTrackDetailScreen: View {
                     onEditSave: { updatedTrack in
                         viewModel.load(track: updatedTrack, force: true)
                     },
-                    onExport: {
-                        viewModel.exportTrack()
+                    onExportGpx: {
+                        viewModel.exportTrack(asFit: false)
+                    },
+                    onExportFit: {
+                        viewModel.exportTrack(asFit: true)
                     }
                 )
             }
@@ -67,7 +70,8 @@ private struct TrackActionsMenu: View {
     let detail: TrackDetail
     let onTrimSave: (ImportedTrack) -> Void
     let onEditSave: (ImportedTrack) -> Void
-    let onExport: () -> Void
+    let onExportGpx: () -> Void
+    let onExportFit: () -> Void
 
     var body: some View {
         Menu {
@@ -89,8 +93,12 @@ private struct TrackActionsMenu: View {
                 Label("Edit", systemImage: "pencil")
             }
 
-            Button(action: onExport) {
+            Button(action: onExportGpx) {
                 Label("Export GPX", systemImage: "square.and.arrow.up")
+            }
+
+            Button(action: onExportFit) {
+                Label("Export FIT", systemImage: "square.and.arrow.up")
             }
         } label: {
             Image(systemName: "ellipsis.circle")

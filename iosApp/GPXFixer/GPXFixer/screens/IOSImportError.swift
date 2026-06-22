@@ -1,11 +1,11 @@
 import Foundation
 
 enum IOSImportError: LocalizedError {
-    case invalidGpx(String)
+    case invalidTrack(String)
 
     var errorDescription: String? {
         switch self {
-        case .invalidGpx(let message):
+        case .invalidTrack(let message):
             return message
         }
     }

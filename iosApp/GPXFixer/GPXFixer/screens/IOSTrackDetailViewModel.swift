@@ -38,24 +38,30 @@ final class IOSTrackDetailViewModel: ObservableObject {
         isLoading = false
     }
 
-    func exportTrack() {
+    func exportTrack(asFit: Bool) {
         guard let detail else { return }
 
-        let content = importFacade.serializeGpx(document: detail.document)
         let url = FileManager.default.temporaryDirectory
-            .appendingPathComponent(exportFileName(for: detail.importedTrack.displayName))
+            .appendingPathComponent(exportFileName(for: detail.importedTrack.displayName, isFit: asFit))
 
         do {
-            try content.write(to: url, atomically: true, encoding: .utf8)
+            let isFit = asFit
+            if isFit {
+                let data = importFacade.serializeFit(track: detail.importedTrack, document: detail.document)
+                try data.write(to: url, options: .atomic)
+            } else {
+                let content = importFacade.serializeGpx(document: detail.document)
+                try content.write(to: url, atomically: true, encoding: .utf8)
+            }
             exportURL = url
             isShareSheetPresented = true
             errorMessage = nil
         } catch {
-            errorMessage = "Failed to export GPX file."
+            errorMessage = "Failed to export track file."
         }
     }
 
-    private func exportFileName(for displayName: String) -> String {
-        "\(sanitizedFileBaseName(for: displayName)).gpx"
+    private func exportFileName(for displayName: String, isFit: Bool) -> String {
+        "\(sanitizedFileBaseName(for: displayName)).\(isFit ? "fit" : "gpx")"
     }
 }
