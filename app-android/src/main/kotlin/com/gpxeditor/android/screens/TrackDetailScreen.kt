@@ -32,7 +32,8 @@ fun TrackDetailScreen(
     onBackClick: () -> Unit,
     onTrimClick: () -> Unit,
     onEditClick: () -> Unit,
-    onExportClick: () -> Unit,
+    onExportGpxClick: () -> Unit,
+    onExportFitClick: () -> Unit,
 ) {
     var isMapFullScreen by remember { mutableStateOf(false) }
 
@@ -55,7 +56,8 @@ fun TrackDetailScreen(
             onBackClick = onBackClick,
             onTrimClick = onTrimClick,
             onEditClick = onEditClick,
-            onExportClick = onExportClick,
+            onExportGpxClick = onExportGpxClick,
+            onExportFitClick = onExportFitClick,
         )
 
         Text(
@@ -101,7 +103,8 @@ private fun TrackDetailTopBar(
     onBackClick: () -> Unit,
     onTrimClick: () -> Unit,
     onEditClick: () -> Unit,
-    onExportClick: () -> Unit,
+    onExportGpxClick: () -> Unit,
+    onExportFitClick: () -> Unit,
 ) {
     var isActionsMenuExpanded by remember { mutableStateOf(false) }
 
@@ -136,10 +139,17 @@ private fun TrackDetailTopBar(
                     },
                 )
                 DropdownMenuItem(
-                    text = { Text("Export") },
+                    text = { Text("Export GPX") },
                     onClick = {
                         isActionsMenuExpanded = false
-                        onExportClick()
+                        onExportGpxClick()
+                    },
+                )
+                DropdownMenuItem(
+                    text = { Text("Export FIT") },
+                    onClick = {
+                        isActionsMenuExpanded = false
+                        onExportFitClick()
                     },
                 )
             }

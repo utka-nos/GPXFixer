@@ -16,9 +16,12 @@ import com.gpxeditor.android.data.imported.AndroidImportClock
 import com.gpxeditor.android.data.imported.AndroidImportIdGenerator
 import com.gpxeditor.android.data.imported.JsonImportedTrackStore
 import com.gpxeditor.android.screens.ImportScreen
+import com.gpxeditor.shared.data.fit.FitActivityDecoder
 import com.gpxeditor.shared.feature.edittrack.DeleteGpxTrackPointUseCase
 import com.gpxeditor.shared.feature.edittrack.MoveGpxTrackPointUseCase
 import com.gpxeditor.shared.feature.edittrack.TrimGpxTrackUseCase
+import com.gpxeditor.shared.feature.exportfit.ExportFitTrackUseCase
+import com.gpxeditor.shared.feature.importfit.ImportFitTrackUseCase
 import com.gpxeditor.shared.feature.importgpx.ImportGpxTrackUseCase
 import com.gpxeditor.shared.feature.trackdetail.TrackDetailUseCase
 import java.io.File
@@ -32,13 +35,23 @@ class MainActivity : ComponentActivity() {
 
         val fileStorage = AndroidGpxTrackFileStorage(applicationContext)
         val importedTrackStore = JsonImportedTrackStore(applicationContext)
+        val importIdGenerator = AndroidImportIdGenerator()
+        val importClock = AndroidImportClock()
         importScreenController = ImportScreenController(
             importGpxTrackUseCase = ImportGpxTrackUseCase(
                 fileStorage = fileStorage,
                 trackStore = importedTrackStore,
-                idGenerator = AndroidImportIdGenerator(),
-                clock = AndroidImportClock(),
+                idGenerator = importIdGenerator,
+                clock = importClock,
             ),
+            importFitTrackUseCase = ImportFitTrackUseCase(
+                fitFileDecoder = FitActivityDecoder(),
+                fileStorage = fileStorage,
+                trackStore = importedTrackStore,
+                idGenerator = importIdGenerator,
+                clock = importClock,
+            ),
+            exportFitTrackUseCase = ExportFitTrackUseCase(fileStorage),
             trackDetailUseCase = TrackDetailUseCase(fileStorage),
             trimGpxTrackUseCase = TrimGpxTrackUseCase(),
             deleteGpxTrackPointUseCase = DeleteGpxTrackPointUseCase(),
@@ -46,13 +59,15 @@ class MainActivity : ComponentActivity() {
             fileStorage = fileStorage,
             importedTrackStore = importedTrackStore,
             readTextFrom = ::readTextFrom,
+            readBytesFrom = ::readBytesFrom,
             displayNameFor = ::displayNameFor,
             exportGpx = ::exportGpx,
+            exportFit = ::exportFit,
             runOnUiThread = { action -> runOnUiThread(action) },
         )
 
         openGpxLauncher = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-            uri?.let(importScreenController::importGpxFrom)
+            uri?.let(importScreenController::importTrackFrom)
         }
 
         setContent {
@@ -64,6 +79,7 @@ class MainActivity : ComponentActivity() {
                             "application/gpx+xml",
                             "application/xml",
                             "text/xml",
+                            "application/vnd.ant.fit",
                             "application/octet-stream",
                             "*/*",
                         ),
@@ -73,7 +89,8 @@ class MainActivity : ComponentActivity() {
                 onBackFromDetail = importScreenController::closeTrackDetail,
                 onTrimTrack = importScreenController::startTrimmingTrack,
                 onEditTrack = importScreenController::startEditingTrack,
-                onExportTrack = importScreenController::exportTrack,
+                onExportTrackAsGpx = importScreenController::exportTrackAsGpx,
+                onExportTrackAsFit = importScreenController::exportTrackAsFit,
                 onBackFromTrim = importScreenController::closeTrimTrack,
                 onPreviewTrim = importScreenController::trimTrack,
                 onSaveTrimmedTrack = importScreenController::saveTrimmedTrack,
@@ -98,7 +115,7 @@ class MainActivity : ComponentActivity() {
         if (intent?.action != Intent.ACTION_VIEW) return
 
         val uri = intent.data ?: return
-        importScreenController.importGpxFrom(uri)
+        importScreenController.importTrackFrom(uri)
     }
 
     private fun readTextFrom(uri: Uri): String {
@@ -106,6 +123,12 @@ class MainActivity : ComponentActivity() {
             ?.bufferedReader()
             ?.use { it.readText() }
             ?: error("Could not open selected GPX file")
+    }
+
+    private fun readBytesFrom(uri: Uri): ByteArray {
+        return contentResolver.openInputStream(uri)
+            ?.use { it.readBytes() }
+            ?: error("Could not open selected FIT file")
     }
 
     private fun displayNameFor(uri: Uri): String? {
@@ -150,6 +173,29 @@ class MainActivity : ComponentActivity() {
         }
 
         startActivity(Intent.createChooser(sendIntent, "Export GPX"))
+    }
+
+    private fun exportFit(displayName: String, content: ByteArray) {
+        val exportDirectory = File(cacheDir, "exports")
+        exportDirectory.mkdirs()
+
+        val file = File(exportDirectory, "${safeFileBaseName(displayName)}.fit")
+        file.writeBytes(content)
+
+        val uri = FileProvider.getUriForFile(
+            this,
+            "${packageName}.fileprovider",
+            file,
+        )
+        val sendIntent = Intent(Intent.ACTION_SEND).apply {
+            type = "application/vnd.ant.fit"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            putExtra(Intent.EXTRA_TITLE, file.name.ifBlank { "track.fit" })
+            clipData = ClipData.newUri(contentResolver, "FIT export", uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+
+        startActivity(Intent.createChooser(sendIntent, "Export FIT"))
     }
 
     private fun safeFileBaseName(displayName: String): String {
