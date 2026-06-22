@@ -35,7 +35,8 @@ fun ImportScreen(
     onBackFromDetail: () -> Unit,
     onTrimTrack: () -> Unit,
     onEditTrack: () -> Unit,
-    onExportTrack: () -> Unit,
+    onExportTrackAsGpx: () -> Unit,
+    onExportTrackAsFit: () -> Unit,
     onBackFromTrim: () -> Unit,
     onPreviewTrim: (ActivityDocument, Int, Int) -> TrimGpxTrackResult,
     onSaveTrimmedTrack: (ActivityDocument) -> Unit,
@@ -80,7 +81,8 @@ fun ImportScreen(
                     onBackClick = onBackFromDetail,
                     onTrimClick = onTrimTrack,
                     onEditClick = onEditTrack,
-                    onExportClick = onExportTrack,
+                    onExportGpxClick = onExportTrackAsGpx,
+                    onExportFitClick = onExportTrackAsFit,
                 )
                 return@Surface
             }
