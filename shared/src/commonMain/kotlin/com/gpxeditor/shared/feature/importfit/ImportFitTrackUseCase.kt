@@ -2,6 +2,7 @@ package com.gpxeditor.shared.feature.importfit
 
 import com.gpxeditor.shared.data.activity.ActivityDocumentJson
 import com.gpxeditor.shared.data.activity.ActivityFitMapper
+import com.gpxeditor.shared.data.fit.FitSourceStore
 import com.gpxeditor.shared.domain.fit.FitDecodeError
 import com.gpxeditor.shared.domain.fit.FitDecodeResult
 import com.gpxeditor.shared.domain.fit.FitFileDecoder
@@ -11,6 +12,8 @@ import com.gpxeditor.shared.domain.imported.ports.ActivityTrackFileStorage
 import com.gpxeditor.shared.domain.imported.ports.ImportClock
 import com.gpxeditor.shared.domain.imported.ports.ImportIdGenerator
 import com.gpxeditor.shared.domain.imported.ports.ImportedTrackStore
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 
 class ImportFitTrackUseCase(
     private val fitFileDecoder: FitFileDecoder,
@@ -26,6 +29,7 @@ class ImportFitTrackUseCase(
         }
     }
 
+    @OptIn(ExperimentalEncodingApi::class)
     private suspend fun importDecodedDocument(
         request: ImportFitTrackRequest,
         decodeResult: FitDecodeResult.Success,
@@ -50,11 +54,14 @@ class ImportFitTrackUseCase(
             pointCount = activityDocument.pointCount,
         )
 
+        val sourceKey = FitSourceStore.keyFor(id)
         fileStorage.save(storageKey, content)
+        fileStorage.save(sourceKey, Base64.encode(request.content))
         try {
             trackStore.add(importedTrack)
         } catch (throwable: Throwable) {
             fileStorage.delete(storageKey)
+            fileStorage.delete(sourceKey)
             throw throwable
         }
 

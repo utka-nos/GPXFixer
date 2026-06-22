@@ -43,4 +43,7 @@ data class ActivityPoint(
     val cadenceRpm: Int? = null,
     val distanceMeters: Double? = null,
     val speedMetersPerSecond: Double? = null,
+    // Index of the source FIT `record` message this point was decoded from.
+    // Survives edits so a FIT export can patch the original byte stream.
+    val sourceIndex: Int? = null,
 )

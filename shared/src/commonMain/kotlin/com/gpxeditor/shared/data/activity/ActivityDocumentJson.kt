@@ -85,6 +85,7 @@ object ActivityDocumentJson {
         appendNumberProperty("cadenceRpm", point.cadenceRpm)
         appendNumberProperty("distanceMeters", point.distanceMeters)
         appendNumberProperty("speedMetersPerSecond", point.speedMetersPerSecond)
+        appendNumberProperty("sourceIndex", point.sourceIndex)
         append("}")
     }
 
@@ -169,6 +170,7 @@ object ActivityDocumentJson {
             cadenceRpm = int("cadenceRpm"),
             distanceMeters = double("distanceMeters"),
             speedMetersPerSecond = double("speedMetersPerSecond"),
+            sourceIndex = int("sourceIndex"),
         )
     }
 

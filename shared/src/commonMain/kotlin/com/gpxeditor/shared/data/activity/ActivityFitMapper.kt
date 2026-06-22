@@ -9,6 +9,9 @@ import com.gpxeditor.shared.domain.fit.FitActivityDocument
 
 object ActivityFitMapper {
     fun fromFitActivity(document: FitActivityDocument): ActivityDocument {
+        // Track a running index over the flattened record stream so each point keeps
+        // a stable reference back to its source FIT `record` message.
+        var sourceIndex = 0
         return ActivityDocument(
             metadata = ActivityMetadata(
                 name = document.metadata.name,
@@ -32,6 +35,7 @@ object ActivityFitMapper {
                                     cadenceRpm = point.cadenceRpm,
                                     distanceMeters = point.distanceMeters,
                                     speedMetersPerSecond = point.speedMetersPerSecond,
+                                    sourceIndex = sourceIndex++,
                                 )
                             },
                         )
