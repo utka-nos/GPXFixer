@@ -23,7 +23,8 @@ class FitRawPatcherTest {
         )
 
         val patched = FitRawPatcher.patch(original, patch)
-        val result = FitActivityDecoder().decode(patched)
+        assertTrue(!patched.timestampChainBroken, "explicit timestamps never break the chain")
+        val result = FitActivityDecoder().decode(patched.bytes)
 
         val success = assertIs<FitDecodeResult.Success>(result)
         val points = success.document.tracks.single().segments.single().points
@@ -38,7 +39,42 @@ class FitRawPatcherTest {
         // file_id was preserved (decoder reads time_created into startTime).
         assertEquals("2020-01-01T00:00:00Z", success.document.metadata.startTime)
         // The unknown device_info message survived byte-for-byte.
-        assertTrue(containsLittleEndianUInt32(patched, deviceMarker), "device_info bytes should be preserved")
+        assertTrue(containsLittleEndianUInt32(patched.bytes, deviceMarker), "device_info bytes should be preserved")
+    }
+
+    @Test
+    fun dropFromCompressedTimestampStreamReportsBrokenChain() {
+        val original = buildCompressedFile()
+
+        // Records: 0 = explicit anchor, 1..3 = compressed. Drop one compressed record.
+        val patch = FitPatch(
+            survivingRecordIndices = setOf(0, 2, 3),
+            positions = emptyMap(),
+        )
+
+        val patched = FitRawPatcher.patch(original, patch)
+
+        assertTrue(patched.timestampChainBroken, "dropping a compressed record breaks the timestamp chain")
+        // Bytes are still structurally valid even though their timestamps are unreliable.
+        val success = assertIs<FitDecodeResult.Success>(FitActivityDecoder().decode(patched.bytes))
+        assertEquals(3, success.document.tracks.single().segments.single().points.size)
+    }
+
+    @Test
+    fun moveOnlyKeepsCompressedTimestampChainIntact() {
+        val original = buildCompressedFile()
+
+        // Every record survives and one is moved: the compressed chain is untouched.
+        val patch = FitPatch(
+            survivingRecordIndices = setOf(0, 1, 2, 3),
+            positions = mapOf(0 to FitLatLon(latitude = 42.5, longitude = 45.5)),
+        )
+
+        val patched = FitRawPatcher.patch(original, patch)
+
+        assertTrue(!patched.timestampChainBroken, "a move that drops nothing leaves the chain intact")
+        val success = assertIs<FitDecodeResult.Success>(FitActivityDecoder().decode(patched.bytes))
+        assertEquals(4, success.document.tracks.single().segments.single().points.size)
     }
 
     @Test
@@ -105,6 +141,46 @@ class FitRawPatcherTest {
         return builder.build()
     }
 
+    /**
+     * A file whose record stream relies on compressed timestamps: one explicit-timestamp
+     * record establishes the reference, then three compressed records carry only a 5-bit
+     * offset. 946771200 is a multiple of 32, so the offsets map straight onto +1s/+2s/+3s.
+     */
+    private fun buildCompressedFile(): ByteArray {
+        val builder = FitFileBuilder()
+        // file_id (global 0), local 1.
+        builder.addDefinition(
+            localType = 1,
+            globalMessageNumber = 0,
+            fields = listOf(FieldDef(0, 1, 0x00), FieldDef(4, 4, 0x86)),
+        )
+        builder.addData(localType = 1, values = listOf(u8(4), u32(946771200L)))
+
+        // Explicit-timestamp record (global 20), local 0 — the compressed reference anchor.
+        builder.addDefinition(
+            localType = 0,
+            globalMessageNumber = 20,
+            fields = listOf(
+                FieldDef(253, 4, 0x86), // timestamp
+                FieldDef(0, 4, 0x85), // position_lat
+                FieldDef(1, 4, 0x85), // position_long
+            ),
+        )
+        builder.addData(0, listOf(u32(946771200L), s32(semicircles(41.0)), s32(semicircles(44.0))))
+
+        // Compressed-timestamp record definition (global 20), local 2 — no timestamp field.
+        builder.addDefinition(
+            localType = 2,
+            globalMessageNumber = 20,
+            fields = listOf(FieldDef(0, 4, 0x85), FieldDef(1, 4, 0x85)),
+        )
+        builder.addCompressedData(localType = 2, timeOffset = 1, values = listOf(s32(semicircles(41.1)), s32(semicircles(44.1))))
+        builder.addCompressedData(localType = 2, timeOffset = 2, values = listOf(s32(semicircles(41.2)), s32(semicircles(44.2))))
+        builder.addCompressedData(localType = 2, timeOffset = 3, values = listOf(s32(semicircles(41.3)), s32(semicircles(44.3))))
+
+        return builder.build()
+    }
+
     private fun semicircles(degrees: Double): Long = (degrees * 2147483648.0 / 180.0).toLong()
 
     private fun containsLittleEndianUInt32(bytes: ByteArray, value: Long): Boolean {
@@ -139,6 +215,13 @@ class FitRawPatcherTest {
 
         fun addData(localType: Int, values: List<ByteArray>) {
             records += localType.toByte()
+            for (value in values) {
+                records += value.toList()
+            }
+        }
+
+        fun addCompressedData(localType: Int, timeOffset: Int, values: List<ByteArray>) {
+            records += (0x80 or ((localType and 0x03) shl 5) or (timeOffset and 0x1F)).toByte()
             for (value in values) {
                 records += value.toList()
             }
