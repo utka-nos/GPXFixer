@@ -14,6 +14,13 @@ import kotlin.math.roundToLong
  * device_info, developer/unknown messages, ...) are copied byte-for-byte, then the
  * header data size and CRCs are recomputed. This is the "patch only edited records"
  * strategy that keeps unmodelled information intact across import -> edit -> export.
+ *
+ * Caveat: `record` messages can carry their timestamp as a compressed-timestamp
+ * header (a 5-bit offset reconstructed relative to the previous timestamp). Dropping
+ * records from such a stream silently corrupts the timestamps of the survivors, even
+ * though the recomputed CRC stays valid. When that happens the patch reports
+ * [FitPatchResult.timestampChainBroken] so the caller can re-encode from the model
+ * (which writes explicit timestamps) instead of shipping a semantically broken file.
  */
 object FitRawPatcher {
     private const val MESSAGE_RECORD = 20
@@ -21,7 +28,7 @@ object FitRawPatcher {
     private const val FIELD_POSITION_LONG = 1
     private const val SEMICIRCLE_RANGE = 2147483648.0
 
-    fun patch(original: ByteArray, patch: FitPatch): ByteArray {
+    fun patch(original: ByteArray, patch: FitPatch): FitPatchResult {
         if (original.size < 14) {
             throw FitDecodeException("FIT file is too small to patch.")
         }
@@ -39,6 +46,8 @@ object FitRawPatcher {
         val definitions = HashMap<Int, RecordLayout>()
         var recordIndex = 0
         var position = headerSize
+        var hasCompressedRecord = false
+        var droppedRecord = false
 
         while (position < dataEnd) {
             val recordStart = position
@@ -49,8 +58,11 @@ object FitRawPatcher {
                     val localType = (header shr 5) and 0x03
                     val layout = definitions[localType]
                         ?: throw FitDecodeException("Compressed message references undefined local type $localType.")
+                    if (layout.globalMessageNumber == MESSAGE_RECORD) hasCompressedRecord = true
                     val length = 1 + layout.dataSize
-                    recordIndex = appendDataMessage(body, original, recordStart, length, layout, recordIndex, patch)
+                    val append = appendDataMessage(body, original, recordStart, length, layout, recordIndex, patch)
+                    recordIndex = append.nextIndex
+                    droppedRecord = droppedRecord || append.dropped
                     position += length
                 }
 
@@ -66,13 +78,20 @@ object FitRawPatcher {
                     val layout = definitions[localType]
                         ?: throw FitDecodeException("Data message references undefined local type $localType.")
                     val length = 1 + layout.dataSize
-                    recordIndex = appendDataMessage(body, original, recordStart, length, layout, recordIndex, patch)
+                    val append = appendDataMessage(body, original, recordStart, length, layout, recordIndex, patch)
+                    recordIndex = append.nextIndex
+                    droppedRecord = droppedRecord || append.dropped
                     position += length
                 }
             }
         }
 
-        return assemble(original, headerSize, body.toByteArray())
+        return FitPatchResult(
+            bytes = assemble(original, headerSize, body.toByteArray()),
+            // Dropping records only corrupts timestamps when the survivors lean on a
+            // compressed-timestamp chain; a pure move keeps every record in place.
+            timestampChainBroken = hasCompressedRecord && droppedRecord,
+        )
     }
 
     private fun appendDataMessage(
@@ -83,15 +102,15 @@ object FitRawPatcher {
         layout: RecordLayout,
         recordIndex: Int,
         patch: FitPatch,
-    ): Int {
+    ): AppendResult {
         if (layout.globalMessageNumber != MESSAGE_RECORD) {
             appendRange(body, original, recordStart, recordStart + length)
-            return recordIndex
+            return AppendResult(recordIndex, dropped = false)
         }
 
         val index = recordIndex
         if (index !in patch.survivingRecordIndices) {
-            return recordIndex + 1 // drop the record, but keep the index aligned
+            return AppendResult(recordIndex + 1, dropped = true) // drop, but keep the index aligned
         }
 
         val moved = patch.positions[index]
@@ -103,7 +122,7 @@ object FitRawPatcher {
         } else {
             appendRange(body, original, recordStart, recordStart + length)
         }
-        return recordIndex + 1
+        return AppendResult(recordIndex + 1, dropped = false)
     }
 
     private fun parseDefinition(original: ByteArray, start: Int): RecordLayout {
@@ -205,7 +224,20 @@ object FitRawPatcher {
         val longitudeOffset: Int?,
         val definitionLength: Int,
     )
+
+    private data class AppendResult(val nextIndex: Int, val dropped: Boolean)
 }
+
+/**
+ * Outcome of a raw patch. [bytes] is always a structurally valid FIT file. When
+ * [timestampChainBroken] is true the edit dropped records from a compressed-timestamp
+ * stream, so the timestamps reconstructed from [bytes] are unreliable and the caller
+ * should re-encode from the model instead of shipping these bytes.
+ */
+class FitPatchResult internal constructor(
+    val bytes: ByteArray,
+    val timestampChainBroken: Boolean,
+)
 
 /** What survived an edit, expressed against source FIT record indices. */
 data class FitPatch(

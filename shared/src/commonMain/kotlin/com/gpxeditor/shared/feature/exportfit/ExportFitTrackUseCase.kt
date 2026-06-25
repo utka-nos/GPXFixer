@@ -21,11 +21,11 @@ class ExportFitTrackUseCase(
 ) {
     suspend fun encode(track: ImportedTrack, document: ActivityDocument): ByteArray {
         val original = readSource(track.id)
-        return if (original != null) {
-            FitRawPatcher.patch(original, FitPatch.from(document))
-        } else {
-            FitEncoder.encode(document)
-        }
+            ?: return FitEncoder.encode(document)
+        val patched = FitRawPatcher.patch(original, FitPatch.from(document))
+        // Patching a compressed-timestamp stream that lost records yields a valid-CRC
+        // file with corrupt timestamps; re-encode from the model in that case.
+        return if (patched.timestampChainBroken) FitEncoder.encode(document) else patched.bytes
     }
 
     @OptIn(ExperimentalEncodingApi::class)
