@@ -11,6 +11,7 @@ import com.gpxeditor.shared.data.gpx.GpxSerializer
 import com.gpxeditor.shared.domain.activity.ActivityDocument
 import com.gpxeditor.shared.domain.imported.ImportedTrack
 import com.gpxeditor.shared.domain.imported.ports.GpxTrackFileStorage
+import com.gpxeditor.shared.feature.deletetrack.DeleteImportedTrackUseCase
 import com.gpxeditor.shared.feature.edittrack.DeleteGpxTrackPointRequest
 import com.gpxeditor.shared.feature.edittrack.DeleteGpxTrackPointUseCase
 import com.gpxeditor.shared.feature.edittrack.MoveGpxTrackPointRequest
@@ -38,6 +39,7 @@ class ImportScreenController(
     private val exportFitTrackUseCase: ExportFitTrackUseCase,
     private val trackDetailUseCase: TrackDetailUseCase,
     private val trimGpxTrackUseCase: TrimGpxTrackUseCase,
+    private val deleteImportedTrackUseCase: DeleteImportedTrackUseCase,
     private val deleteGpxTrackPointUseCase: DeleteGpxTrackPointUseCase,
     private val moveGpxTrackPointUseCase: MoveGpxTrackPointUseCase,
     private val fileStorage: GpxTrackFileStorage,
@@ -327,6 +329,35 @@ class ImportScreenController(
                         isLoadingTrackDetail = false,
                         statusMessage = null,
                         errorMessage = throwable.message ?: "Failed to save trimmed track",
+                    )
+                }
+            }
+        }.start()
+    }
+
+    fun deleteTrack(track: ImportedTrack) {
+        state = state.copy(
+            statusMessage = null,
+            errorMessage = null,
+        )
+
+        Thread {
+            runCatching {
+                runSuspendBlocking { deleteImportedTrackUseCase(track) }
+                runSuspendBlocking { importedTrackStore.getAll() }
+            }.onSuccess { history ->
+                runOnUiThread {
+                    state = state.copy(
+                        tracks = history,
+                        statusMessage = "Deleted ${track.displayName}",
+                        errorMessage = null,
+                    )
+                }
+            }.onFailure { throwable ->
+                runOnUiThread {
+                    state = state.copy(
+                        statusMessage = null,
+                        errorMessage = throwable.message ?: "Failed to delete track",
                     )
                 }
             }

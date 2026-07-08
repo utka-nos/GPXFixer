@@ -43,6 +43,9 @@ struct IOSImportScreen: View {
                                 ImportedTrackRow(track: track)
                             }
                         }
+                        .onDelete { offsets in
+                            viewModel.deleteTracks(at: offsets)
+                        }
                     }
                 }
             }

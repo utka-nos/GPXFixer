@@ -10,6 +10,7 @@ import com.gpxeditor.shared.data.activity.ActivityDocumentJson
 import com.gpxeditor.shared.data.activity.ActivityGpxMapper
 import com.gpxeditor.shared.data.fit.FitActivityDecoder
 import com.gpxeditor.shared.data.gpx.GpxSerializer
+import com.gpxeditor.shared.feature.deletetrack.DeleteImportedTrackUseCase
 import com.gpxeditor.shared.feature.edittrack.DeleteGpxTrackPointRequest
 import com.gpxeditor.shared.feature.edittrack.DeleteGpxTrackPointResult
 import com.gpxeditor.shared.feature.edittrack.DeleteGpxTrackPointUseCase
@@ -79,6 +80,10 @@ class IosImportFacade {
         clock = clock,
     )
     private val exportFitTrackUseCase = ExportFitTrackUseCase(fileStorage)
+    private val deleteImportedTrackUseCase = DeleteImportedTrackUseCase(
+        fileStorage = fileStorage,
+        trackStore = trackStore,
+    )
     private val trackDetailUseCase = TrackDetailUseCase(fileStorage)
     private val trimGpxTrackUseCase = TrimGpxTrackUseCase()
     private val deleteGpxTrackPointUseCase = DeleteGpxTrackPointUseCase()
@@ -114,6 +119,10 @@ class IosImportFacade {
                 ),
             )
         }
+    }
+
+    fun deleteTrack(track: ImportedTrack) {
+        runSuspendBlocking { deleteImportedTrackUseCase(track) }
     }
 
     fun getTrackDetail(track: ImportedTrack): TrackDetailResult {

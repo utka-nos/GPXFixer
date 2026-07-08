@@ -7,12 +7,18 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -32,6 +38,7 @@ fun ImportScreen(
     state: ImportScreenState,
     onImportClick: () -> Unit,
     onTrackClick: (ImportedTrack) -> Unit,
+    onDeleteTrack: (ImportedTrack) -> Unit,
     onBackFromDetail: () -> Unit,
     onTrimTrack: () -> Unit,
     onEditTrack: () -> Unit,
@@ -45,6 +52,8 @@ fun ImportScreen(
     onMoveTrackPoint: (ActivityDocument, Int, Double, Double) -> MoveGpxTrackPointResult,
     onSaveEditedTrack: (ActivityDocument) -> Unit,
 ) {
+    var trackPendingDelete by remember { mutableStateOf<ImportedTrack?>(null) }
+
     MaterialTheme {
         Surface(modifier = Modifier.fillMaxSize()) {
             state.editTrackDetail?.let { detail ->
@@ -143,9 +152,33 @@ fun ImportScreen(
                         ImportedTrackRow(
                             track = track,
                             onClick = { onTrackClick(track) },
+                            onDeleteClick = { trackPendingDelete = track },
                         )
                     }
                 }
+            }
+
+            trackPendingDelete?.let { track ->
+                AlertDialog(
+                    onDismissRequest = { trackPendingDelete = null },
+                    title = { Text("Delete track?") },
+                    text = { Text("\"${track.displayName}\" will be removed permanently.") },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                trackPendingDelete = null
+                                onDeleteTrack(track)
+                            },
+                        ) {
+                            Text("Delete", color = MaterialTheme.colorScheme.error)
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { trackPendingDelete = null }) {
+                            Text("Cancel")
+                        }
+                    },
+                )
             }
         }
     }
