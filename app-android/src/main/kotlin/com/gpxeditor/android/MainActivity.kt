@@ -200,7 +200,7 @@ class MainActivity : ComponentActivity() {
 
     private fun safeFileBaseName(displayName: String): String {
         return displayName
-            .replace(Regex("[^A-Za-z0-9 _-]"), "-")
+            .replace(Regex("[^\\p{L}\\p{N} _-]"), "-")
             .trim()
             .ifBlank { "track" }
     }
