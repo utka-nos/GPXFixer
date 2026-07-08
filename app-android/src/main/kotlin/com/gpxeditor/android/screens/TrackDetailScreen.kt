@@ -10,11 +10,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -30,12 +33,14 @@ fun TrackDetailScreen(
     statusMessage: String?,
     errorMessage: String?,
     onBackClick: () -> Unit,
+    onRenameConfirm: (String) -> Unit,
     onTrimClick: () -> Unit,
     onEditClick: () -> Unit,
     onExportGpxClick: () -> Unit,
     onExportFitClick: () -> Unit,
 ) {
     var isMapFullScreen by remember { mutableStateOf(false) }
+    var isRenameDialogVisible by remember { mutableStateOf(false) }
 
     if (isMapFullScreen) {
         TrackMapFullScreen(
@@ -54,6 +59,7 @@ fun TrackDetailScreen(
     ) {
         TrackDetailTopBar(
             onBackClick = onBackClick,
+            onRenameClick = { isRenameDialogVisible = true },
             onTrimClick = onTrimClick,
             onEditClick = onEditClick,
             onExportGpxClick = onExportGpxClick,
@@ -96,11 +102,59 @@ fun TrackDetailScreen(
         WarningsSection(warnings = detail.warnings)
         TrackSegmentsSection(segments = detail.segments)
     }
+
+    if (isRenameDialogVisible) {
+        RenameTrackDialog(
+            currentName = detail.importedTrack.displayName,
+            onConfirm = { newName ->
+                isRenameDialogVisible = false
+                onRenameConfirm(newName)
+            },
+            onDismiss = { isRenameDialogVisible = false },
+        )
+    }
+}
+
+@Composable
+private fun RenameTrackDialog(
+    currentName: String,
+    onConfirm: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var name by remember { mutableStateOf(currentName) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Rename track") },
+        text = {
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                label = { Text("Track name") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        },
+        confirmButton = {
+            TextButton(
+                enabled = name.isNotBlank(),
+                onClick = { onConfirm(name) },
+            ) {
+                Text("Rename")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        },
+    )
 }
 
 @Composable
 private fun TrackDetailTopBar(
     onBackClick: () -> Unit,
+    onRenameClick: () -> Unit,
     onTrimClick: () -> Unit,
     onEditClick: () -> Unit,
     onExportGpxClick: () -> Unit,
@@ -124,6 +178,13 @@ private fun TrackDetailTopBar(
                 expanded = isActionsMenuExpanded,
                 onDismissRequest = { isActionsMenuExpanded = false },
             ) {
+                DropdownMenuItem(
+                    text = { Text("Rename") },
+                    onClick = {
+                        isActionsMenuExpanded = false
+                        onRenameClick()
+                    },
+                )
                 DropdownMenuItem(
                     text = { Text("Trim track") },
                     onClick = {

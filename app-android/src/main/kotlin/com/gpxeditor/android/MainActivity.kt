@@ -24,6 +24,7 @@ import com.gpxeditor.shared.feature.edittrack.TrimGpxTrackUseCase
 import com.gpxeditor.shared.feature.exportfit.ExportFitTrackUseCase
 import com.gpxeditor.shared.feature.importfit.ImportFitTrackUseCase
 import com.gpxeditor.shared.feature.importgpx.ImportGpxTrackUseCase
+import com.gpxeditor.shared.feature.renametrack.RenameTrackUseCase
 import com.gpxeditor.shared.feature.trackdetail.TrackDetailUseCase
 import java.io.File
 
@@ -54,6 +55,7 @@ class MainActivity : ComponentActivity() {
             ),
             exportFitTrackUseCase = ExportFitTrackUseCase(fileStorage),
             trackDetailUseCase = TrackDetailUseCase(fileStorage),
+            renameTrackUseCase = RenameTrackUseCase(importedTrackStore),
             trimGpxTrackUseCase = TrimGpxTrackUseCase(),
             deleteImportedTrackUseCase = DeleteImportedTrackUseCase(
                 fileStorage = fileStorage,
@@ -93,6 +95,7 @@ class MainActivity : ComponentActivity() {
                 onTrackClick = importScreenController::openTrackDetail,
                 onDeleteTrack = importScreenController::deleteTrack,
                 onBackFromDetail = importScreenController::closeTrackDetail,
+                onRenameTrack = importScreenController::renameTrack,
                 onTrimTrack = importScreenController::startTrimmingTrack,
                 onEditTrack = importScreenController::startEditingTrack,
                 onExportTrackAsGpx = importScreenController::exportTrackAsGpx,
