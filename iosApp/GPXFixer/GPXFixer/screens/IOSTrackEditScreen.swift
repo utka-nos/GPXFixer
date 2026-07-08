@@ -48,9 +48,15 @@ struct IOSTrackEditScreen: View {
                     .clipShape(RoundedRectangle(cornerRadius: 8))
                     .padding(16)
             } else if let selectedPointIndex = viewModel.selectedPointIndex {
+                let neighbors = neighborPointIndices(of: selectedPointIndex)
                 SelectedPointMenu(
                     pointIndex: selectedPointIndex,
                     pointTime: pointTime(at: selectedPointIndex),
+                    previousPointIndex: neighbors.previous,
+                    nextPointIndex: neighbors.next,
+                    onSelectPoint: { pointIndex in
+                        viewModel.selectedPointIndex = pointIndex
+                    },
                     onDelete: {
                         viewModel.deleteSelectedPoint()
                     },
@@ -83,6 +89,17 @@ struct IOSTrackEditScreen: View {
         }
     }
 
+    private func neighborPointIndices(of index: Int) -> (previous: Int?, next: Int?) {
+        guard let geometry = EditableTrackMapGeometry(document: viewModel.document),
+              let position = geometry.points.firstIndex(where: { $0.index == index }) else {
+            return (nil, nil)
+        }
+
+        let previous = position > 0 ? geometry.points[position - 1].index : nil
+        let next = position + 1 < geometry.points.count ? geometry.points[position + 1].index : nil
+        return (previous, next)
+    }
+
     private func pointTime(at index: Int) -> String? {
         var globalPointIndex = 0
         for track in viewModel.document.tracks {
@@ -102,13 +119,40 @@ struct IOSTrackEditScreen: View {
 private struct SelectedPointMenu: View {
     let pointIndex: Int
     let pointTime: String?
+    let previousPointIndex: Int?
+    let nextPointIndex: Int?
+    let onSelectPoint: (Int) -> Void
     let onDelete: () -> Void
     let onMove: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Point \(pointIndex + 1)")
-                .font(.headline)
+            HStack(spacing: 12) {
+                Text("Point \(pointIndex + 1)")
+                    .font(.headline)
+
+                Spacer()
+
+                Button {
+                    if let previousPointIndex {
+                        onSelectPoint(previousPointIndex)
+                    }
+                } label: {
+                    Image(systemName: "chevron.left")
+                }
+                .buttonStyle(.bordered)
+                .disabled(previousPointIndex == nil)
+
+                Button {
+                    if let nextPointIndex {
+                        onSelectPoint(nextPointIndex)
+                    }
+                } label: {
+                    Image(systemName: "chevron.right")
+                }
+                .buttonStyle(.bordered)
+                .disabled(nextPointIndex == nil)
+            }
 
             Text("Index: \(pointIndex)")
                 .foregroundStyle(.secondary)

@@ -134,9 +134,16 @@ fun TrackEditScreen(
                     style = MaterialTheme.typography.bodyLarge,
                 )
             }
-        } else if (selectedPoint != null) {
+        } else if (selectedPoint != null && geometry != null) {
+            val pointPosition = geometry.points.indexOf(selectedPoint)
             SelectedPointMenu(
                 point = selectedPoint,
+                previousPointIndex = geometry.points.getOrNull(pointPosition - 1)?.index,
+                nextPointIndex = geometry.points.getOrNull(pointPosition + 1)?.index,
+                onSelectPoint = { pointIndex ->
+                    selectedPointIndex = pointIndex
+                    localErrorMessage = null
+                },
                 onDeleteClick = {
                     when (val result = onDeletePoint(editedDocument, selectedPoint.index)) {
                         is DeleteGpxTrackPointResult.Failure -> {
@@ -212,6 +219,9 @@ private fun TrackEditTopBar(
 @Composable
 private fun SelectedPointMenu(
     point: EditableTrackPoint,
+    previousPointIndex: Int?,
+    nextPointIndex: Int?,
+    onSelectPoint: (Int) -> Unit,
     onDeleteClick: () -> Unit,
     onMoveClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -226,10 +236,29 @@ private fun SelectedPointMenu(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text(
-                text = "Point ${point.index + 1}",
-                style = MaterialTheme.typography.titleMedium,
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "Point ${point.index + 1}",
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                Spacer(modifier = Modifier.weight(1f))
+                OutlinedButton(
+                    onClick = { previousPointIndex?.let(onSelectPoint) },
+                    enabled = previousPointIndex != null,
+                ) {
+                    Text("←")
+                }
+                OutlinedButton(
+                    onClick = { nextPointIndex?.let(onSelectPoint) },
+                    enabled = nextPointIndex != null,
+                ) {
+                    Text("→")
+                }
+            }
             Text(
                 text = "Index: ${point.index}",
                 style = MaterialTheme.typography.bodyMedium,
