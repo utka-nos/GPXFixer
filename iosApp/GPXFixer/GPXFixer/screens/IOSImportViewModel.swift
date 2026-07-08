@@ -16,6 +16,19 @@ final class IOSImportViewModel: ObservableObject {
         tracks = importFacade.getImportedTracks()
     }
 
+    func deleteTracks(at offsets: IndexSet) {
+        statusMessage = nil
+        errorMessage = nil
+
+        for index in offsets {
+            let track = tracks[index]
+            importFacade.deleteTrack(track: track)
+            statusMessage = "Deleted \(track.displayName)"
+        }
+
+        tracks = importFacade.getImportedTracks()
+    }
+
     func importTrack(from url: URL) {
         isImporting = true
         statusMessage = nil
