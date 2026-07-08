@@ -53,6 +53,9 @@ fun TrackEditScreen(
     var selectedPointIndex by remember(detail.importedTrack.id) { mutableStateOf<Int?>(null) }
     var movingPointIndex by remember(detail.importedTrack.id) { mutableStateOf<Int?>(null) }
     var localErrorMessage by remember(detail.importedTrack.id) { mutableStateOf<String?>(null) }
+    var deletedPointSnapshots by remember(detail.importedTrack.id) {
+        mutableStateOf<List<DeletedPointSnapshot>>(emptyList())
+    }
     val geometry = remember(editedDocument) { EditableTrackMapGeometry.from(editedDocument) }
     val hasChanges = editedDocument != detail.document
 
@@ -99,6 +102,9 @@ fun TrackEditScreen(
                             selectedPointIndex = result.movedPointIndex
                             movingPointIndex = null
                             localErrorMessage = null
+                            // Undo restores a full pre-delete snapshot, which would
+                            // silently revert this move too — drop the history instead.
+                            deletedPointSnapshots = emptyList()
                         }
                     }
                 },
@@ -109,7 +115,17 @@ fun TrackEditScreen(
         TrackEditTopBar(
             isSaving = isSaving,
             canSave = hasChanges && !isSaving,
+            canUndoDelete = deletedPointSnapshots.isNotEmpty() && !isSaving,
             onBackClick = onBackClick,
+            onUndoDeleteClick = {
+                deletedPointSnapshots.lastOrNull()?.let { snapshot ->
+                    editedDocument = snapshot.document
+                    selectedPointIndex = snapshot.pointIndex
+                    movingPointIndex = null
+                    localErrorMessage = null
+                    deletedPointSnapshots = deletedPointSnapshots.dropLast(1)
+                }
+            },
             onSaveClick = { onSaveClick(editedDocument) },
             modifier = Modifier
                 .align(Alignment.TopCenter)
@@ -150,6 +166,10 @@ fun TrackEditScreen(
                             localErrorMessage = result.error.message
                         }
                         is DeleteGpxTrackPointResult.Success -> {
+                            deletedPointSnapshots = deletedPointSnapshots + DeletedPointSnapshot(
+                                document = editedDocument,
+                                pointIndex = selectedPoint.index,
+                            )
                             editedDocument = result.document
                             selectedPointIndex = null
                             localErrorMessage = null
@@ -190,7 +210,9 @@ fun TrackEditScreen(
 private fun TrackEditTopBar(
     isSaving: Boolean,
     canSave: Boolean,
+    canUndoDelete: Boolean,
     onBackClick: () -> Unit,
+    onUndoDeleteClick: () -> Unit,
     onSaveClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -209,6 +231,9 @@ private fun TrackEditTopBar(
                 Text("Back")
             }
             Spacer(modifier = Modifier.weight(1f))
+            OutlinedButton(onClick = onUndoDeleteClick, enabled = canUndoDelete) {
+                Text("Undo delete")
+            }
             Button(onClick = onSaveClick, enabled = canSave) {
                 Text(if (isSaving) "Saving" else "Save")
             }
@@ -432,4 +457,9 @@ private data class EditableTrackPoint(
     val index: Int,
     val position: LatLng,
     val time: String?,
+)
+
+private data class DeletedPointSnapshot(
+    val document: ActivityDocument,
+    val pointIndex: Int,
 )

@@ -80,12 +80,21 @@ struct IOSTrackEditScreen: View {
         .navigationTitle("Edit track")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            Button("Save") {
-                let updatedTrack = viewModel.saveEditedTrack()
-                onSave(updatedTrack)
-                dismiss()
+            ToolbarItemGroup(placement: .topBarTrailing) {
+                Button {
+                    viewModel.undoLastDeletedPoint()
+                } label: {
+                    Label("Undo delete", systemImage: "arrow.uturn.backward")
+                }
+                .disabled(!viewModel.canUndoDelete)
+
+                Button("Save") {
+                    let updatedTrack = viewModel.saveEditedTrack()
+                    onSave(updatedTrack)
+                    dismiss()
+                }
+                .disabled(!viewModel.hasChanges)
             }
-            .disabled(!viewModel.hasChanges)
         }
     }
 

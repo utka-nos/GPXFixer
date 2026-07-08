@@ -9,9 +9,11 @@ final class IOSTrackEditViewModel: ObservableObject {
     @Published var movingPointIndex: Int?
     @Published var errorMessage: String?
     @Published private(set) var hasChanges = false
+    @Published private(set) var canUndoDelete = false
 
     private let detail: TrackDetail
     private let importFacade = IosImportFacade()
+    private var deletedPointSnapshots: [(document: ActivityDocument, pointIndex: Int)] = []
 
     init(detail: TrackDetail) {
         self.detail = detail
@@ -29,6 +31,8 @@ final class IOSTrackEditViewModel: ObservableObject {
         if let failure = result as? DeleteGpxTrackPointResultFailure {
             errorMessage = failure.error.message
         } else if let success = result as? DeleteGpxTrackPointResultSuccess {
+            deletedPointSnapshots.append((document: document, pointIndex: selectedPointIndex))
+            canUndoDelete = true
             document = success.document
             self.selectedPointIndex = nil
             movingPointIndex = nil
@@ -37,6 +41,17 @@ final class IOSTrackEditViewModel: ObservableObject {
         } else {
             errorMessage = "Failed to delete track point."
         }
+    }
+
+    func undoLastDeletedPoint() {
+        guard let snapshot = deletedPointSnapshots.popLast() else { return }
+
+        document = snapshot.document
+        selectedPointIndex = snapshot.pointIndex
+        movingPointIndex = nil
+        errorMessage = nil
+        canUndoDelete = !deletedPointSnapshots.isEmpty
+        hasChanges = document != detail.document
     }
 
     func beginMovingSelectedPoint() {
@@ -67,6 +82,10 @@ final class IOSTrackEditViewModel: ObservableObject {
             self.movingPointIndex = nil
             errorMessage = nil
             hasChanges = true
+            // Undo restores a full pre-delete snapshot, which would silently
+            // revert this move too — drop the history instead.
+            deletedPointSnapshots = []
+            canUndoDelete = false
         } else {
             errorMessage = "Failed to move track point."
         }
