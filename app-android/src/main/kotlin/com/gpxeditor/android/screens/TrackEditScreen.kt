@@ -234,6 +234,10 @@ private fun SelectedPointMenu(
                 text = "Index: ${point.index}",
                 style = MaterialTheme.typography.bodyMedium,
             )
+            Text(
+                text = "Time: ${point.time ?: "No data"}",
+                style = MaterialTheme.typography.bodyMedium,
+            )
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Button(onClick = onDeleteClick) {
                     Text("Delete")
@@ -348,6 +352,7 @@ private data class EditableTrackMapGeometry(
                         pointMarkers += EditableTrackPoint(
                             index = pointIndex,
                             position = position,
+                            time = point.time,
                         )
                         position
                     }
@@ -397,4 +402,5 @@ private data class EditableTrackMapGeometry(
 private data class EditableTrackPoint(
     val index: Int,
     val position: LatLng,
+    val time: String?,
 )
