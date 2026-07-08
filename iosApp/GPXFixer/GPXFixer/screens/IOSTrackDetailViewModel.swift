@@ -38,6 +38,23 @@ final class IOSTrackDetailViewModel: ObservableObject {
         isLoading = false
     }
 
+    func renameTrack(to newDisplayName: String) {
+        guard let detail else { return }
+
+        let result = importFacade.renameTrack(
+            track: detail.importedTrack,
+            newDisplayName: newDisplayName
+        )
+        if let failure = result as? RenameTrackResultFailure {
+            errorMessage = failure.message
+        } else if let success = result as? RenameTrackResultSuccess {
+            errorMessage = nil
+            load(track: success.importedTrack, force: true)
+        } else {
+            errorMessage = "Failed to rename track"
+        }
+    }
+
     func exportTrack(asFit: Bool) {
         guard let detail else { return }
 

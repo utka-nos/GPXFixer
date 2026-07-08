@@ -27,6 +27,9 @@ import com.gpxeditor.shared.feature.importfit.ImportFitTrackUseCase
 import com.gpxeditor.shared.feature.importgpx.ImportGpxTrackRequest
 import com.gpxeditor.shared.feature.importgpx.ImportGpxTrackResult
 import com.gpxeditor.shared.feature.importgpx.ImportGpxTrackUseCase
+import com.gpxeditor.shared.feature.renametrack.RenameTrackRequest
+import com.gpxeditor.shared.feature.renametrack.RenameTrackResult
+import com.gpxeditor.shared.feature.renametrack.RenameTrackUseCase
 import com.gpxeditor.shared.feature.trackdetail.TrackDetailResult
 import com.gpxeditor.shared.feature.trackdetail.TrackDetailUseCase
 import kotlinx.cinterop.ExperimentalForeignApi
@@ -85,6 +88,7 @@ class IosImportFacade {
         trackStore = trackStore,
     )
     private val trackDetailUseCase = TrackDetailUseCase(fileStorage)
+    private val renameTrackUseCase = RenameTrackUseCase(trackStore)
     private val trimGpxTrackUseCase = TrimGpxTrackUseCase()
     private val deleteGpxTrackPointUseCase = DeleteGpxTrackPointUseCase()
     private val moveGpxTrackPointUseCase = MoveGpxTrackPointUseCase()
@@ -127,6 +131,20 @@ class IosImportFacade {
 
     fun getTrackDetail(track: ImportedTrack): TrackDetailResult {
         return runSuspendBlocking { trackDetailUseCase(track) }
+    }
+
+    fun renameTrack(
+        track: ImportedTrack,
+        newDisplayName: String,
+    ): RenameTrackResult {
+        return runSuspendBlocking {
+            renameTrackUseCase(
+                RenameTrackRequest(
+                    track = track,
+                    newDisplayName = newDisplayName,
+                ),
+            )
+        }
     }
 
     fun trimTrack(

@@ -25,6 +25,9 @@ import com.gpxeditor.shared.feature.importfit.ImportFitTrackUseCase
 import com.gpxeditor.shared.feature.importgpx.ImportGpxTrackRequest
 import com.gpxeditor.shared.feature.importgpx.ImportGpxTrackResult
 import com.gpxeditor.shared.feature.importgpx.ImportGpxTrackUseCase
+import com.gpxeditor.shared.feature.renametrack.RenameTrackRequest
+import com.gpxeditor.shared.feature.renametrack.RenameTrackResult
+import com.gpxeditor.shared.feature.renametrack.RenameTrackUseCase
 import com.gpxeditor.shared.feature.trackdetail.TrackDetail
 import com.gpxeditor.shared.feature.trackdetail.TrackDetailResult
 import com.gpxeditor.shared.feature.trackdetail.TrackDetailUseCase
@@ -38,6 +41,7 @@ class ImportScreenController(
     private val importFitTrackUseCase: ImportFitTrackUseCase,
     private val exportFitTrackUseCase: ExportFitTrackUseCase,
     private val trackDetailUseCase: TrackDetailUseCase,
+    private val renameTrackUseCase: RenameTrackUseCase,
     private val trimGpxTrackUseCase: TrimGpxTrackUseCase,
     private val deleteImportedTrackUseCase: DeleteImportedTrackUseCase,
     private val deleteGpxTrackPointUseCase: DeleteGpxTrackPointUseCase,
@@ -178,6 +182,57 @@ class ImportScreenController(
             editTrackDetail = null,
             isLoadingTrackDetail = false,
         )
+    }
+
+    fun renameTrack(newDisplayName: String) {
+        val detail = state.selectedTrackDetail ?: return
+        state = state.copy(
+            isLoadingTrackDetail = true,
+            statusMessage = null,
+            errorMessage = null,
+        )
+
+        Thread {
+            runCatching {
+                val result = runSuspendBlocking {
+                    renameTrackUseCase(
+                        RenameTrackRequest(
+                            track = detail.importedTrack,
+                            newDisplayName = newDisplayName,
+                        ),
+                    )
+                }
+                val history = runSuspendBlocking { importedTrackStore.getAll() }
+
+                result to history
+            }.onSuccess { (result, history) ->
+                runOnUiThread {
+                    state = when (result) {
+                        is RenameTrackResult.Failure -> state.copy(
+                            isLoadingTrackDetail = false,
+                            statusMessage = null,
+                            errorMessage = result.message,
+                        )
+
+                        is RenameTrackResult.Success -> state.copy(
+                            tracks = history,
+                            isLoadingTrackDetail = false,
+                            selectedTrackDetail = detail.copy(importedTrack = result.importedTrack),
+                            statusMessage = "Renamed to ${result.importedTrack.displayName}",
+                            errorMessage = null,
+                        )
+                    }
+                }
+            }.onFailure { throwable ->
+                runOnUiThread {
+                    state = state.copy(
+                        isLoadingTrackDetail = false,
+                        statusMessage = null,
+                        errorMessage = throwable.message ?: "Failed to rename track",
+                    )
+                }
+            }
+        }.start()
     }
 
     fun startTrimmingTrack() {
