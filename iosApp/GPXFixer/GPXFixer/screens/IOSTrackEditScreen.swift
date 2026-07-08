@@ -50,6 +50,7 @@ struct IOSTrackEditScreen: View {
             } else if let selectedPointIndex = viewModel.selectedPointIndex {
                 SelectedPointMenu(
                     pointIndex: selectedPointIndex,
+                    pointTime: pointTime(at: selectedPointIndex),
                     onDelete: {
                         viewModel.deleteSelectedPoint()
                     },
@@ -81,10 +82,26 @@ struct IOSTrackEditScreen: View {
             .disabled(!viewModel.hasChanges)
         }
     }
+
+    private func pointTime(at index: Int) -> String? {
+        var globalPointIndex = 0
+        for track in viewModel.document.tracks {
+            for segment in track.segments {
+                for point in segment.points {
+                    if globalPointIndex == index {
+                        return point.time
+                    }
+                    globalPointIndex += 1
+                }
+            }
+        }
+        return nil
+    }
 }
 
 private struct SelectedPointMenu: View {
     let pointIndex: Int
+    let pointTime: String?
     let onDelete: () -> Void
     let onMove: () -> Void
 
@@ -94,6 +111,9 @@ private struct SelectedPointMenu: View {
                 .font(.headline)
 
             Text("Index: \(pointIndex)")
+                .foregroundStyle(.secondary)
+
+            Text("Time: \(pointTime ?? "No data")")
                 .foregroundStyle(.secondary)
 
             HStack(spacing: 12) {
