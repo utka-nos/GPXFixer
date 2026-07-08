@@ -5,6 +5,8 @@ struct IOSTrackDetailScreen: View {
     let track: ImportedTrack
 
     @StateObject private var viewModel = IOSTrackDetailViewModel()
+    @State private var isRenameAlertPresented = false
+    @State private var renameText = ""
 
     var body: some View {
         List {
@@ -35,11 +37,15 @@ struct IOSTrackDetailScreen: View {
                 TrackSegmentsSection(segments: detail.segments)
             }
         }
-        .navigationTitle(track.displayName)
+        .navigationTitle(viewModel.detail?.importedTrack.displayName ?? track.displayName)
         .toolbar {
             if let detail = viewModel.detail {
                 TrackActionsMenu(
                     detail: detail,
+                    onRename: {
+                        renameText = detail.importedTrack.displayName
+                        isRenameAlertPresented = true
+                    },
                     onTrimSave: { updatedTrack in
                         viewModel.load(track: updatedTrack, force: true)
                     },
@@ -58,6 +64,13 @@ struct IOSTrackDetailScreen: View {
         .onAppear {
             viewModel.load(track: track)
         }
+        .alert("Rename track", isPresented: $isRenameAlertPresented) {
+            TextField("Track name", text: $renameText)
+            Button("Cancel", role: .cancel) {}
+            Button("Rename") {
+                viewModel.renameTrack(to: renameText)
+            }
+        }
         .sheet(isPresented: $viewModel.isShareSheetPresented) {
             if let url = viewModel.exportURL {
                 ActivityView(activityItems: [url])
@@ -68,6 +81,7 @@ struct IOSTrackDetailScreen: View {
 
 private struct TrackActionsMenu: View {
     let detail: TrackDetail
+    let onRename: () -> Void
     let onTrimSave: (ImportedTrack) -> Void
     let onEditSave: (ImportedTrack) -> Void
     let onExportGpx: () -> Void
@@ -75,6 +89,10 @@ private struct TrackActionsMenu: View {
 
     var body: some View {
         Menu {
+            Button(action: onRename) {
+                Label("Rename", systemImage: "pencil.line")
+            }
+
             NavigationLink {
                 IOSTrackTrimScreen(
                     detail: detail,
