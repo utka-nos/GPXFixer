@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">GPX Editor</string>
+    <string name="recording_notification_channel">Track recording</string>
+    <string name="recording_notification_recording">Recording track</string>
+    <string name="recording_notification_paused">Recording paused</string>
 </resources>

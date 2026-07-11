@@ -11,6 +11,14 @@ fun formatDistance(meters: Double): String {
     }
 }
 
+fun formatDuration(millis: Long): String {
+    val totalSeconds = millis / 1_000
+    val hours = totalSeconds / 3_600
+    val minutes = (totalSeconds % 3_600) / 60
+    val seconds = totalSeconds % 60
+    return String.format(Locale.US, "%02d:%02d:%02d", hours, minutes, seconds)
+}
+
 fun formatElevation(meters: Double?): String {
     return meters?.let { String.format(Locale.US, "%.0f m", it) } ?: "No data"
 }
