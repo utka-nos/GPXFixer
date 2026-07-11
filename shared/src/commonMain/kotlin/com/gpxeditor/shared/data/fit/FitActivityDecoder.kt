@@ -130,7 +130,7 @@ class FitActivityDecoder : FitFileDecoder {
 
     private fun semicirclesToDegrees(semicircles: Long): Double = semicircles * SEMICIRCLE_TO_DEGREES
 
-    private fun sportName(code: Long): String = SPORTS[code.toInt()] ?: "sport_$code"
+    private fun sportName(code: Long): String = FitSports.name(code)
 
     private fun manufacturerName(code: Long): String? = MANUFACTURERS[code.toInt()]
 
@@ -188,19 +188,6 @@ class FitActivityDecoder : FitFileDecoder {
 
         // Seconds between the Unix epoch and the FIT epoch (1989-12-31T00:00:00Z).
         const val FIT_EPOCH_OFFSET = 631065600L
-
-        val SPORTS = mapOf(
-            0 to "generic",
-            1 to "running",
-            2 to "cycling",
-            5 to "swimming",
-            11 to "walking",
-            12 to "cross_country_skiing",
-            13 to "alpine_skiing",
-            14 to "snowboarding",
-            15 to "rowing",
-            17 to "hiking",
-        )
 
         val MANUFACTURERS = mapOf(
             1 to "Garmin",
