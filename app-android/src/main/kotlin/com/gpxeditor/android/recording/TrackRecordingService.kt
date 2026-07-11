@@ -31,6 +31,8 @@ import com.gpxeditor.shared.feature.recordtrack.SaveRecordedTrackUseCase
 import com.gpxeditor.shared.feature.recordtrack.TrackRecorder
 import com.gpxeditor.shared.data.ble.KablePowerSensor
 import com.gpxeditor.shared.data.ble.PowerSensorSettingsStore
+import com.gpxeditor.shared.data.ble.PowerSensorReconnectManager
+import com.gpxeditor.shared.data.ble.PowerSensorRecordingStatus
 import java.util.concurrent.Executors
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -226,8 +228,16 @@ class TrackRecordingService : Service() {
     }
 
     private fun startPowerSensor() {
-        if (powerSensorJob != null || !PowerSensorPermissions.allGranted(this)) return
-        val selected = PowerSensorSettingsStore(FilePowerSensorSettingsStorage(this)).load() ?: return
+        if (powerSensorJob != null) return
+        if (!PowerSensorPermissions.allGranted(this)) {
+            _powerSensorStatus.value = PowerSensorRecordingStatus.NOT_CONNECTED
+            return
+        }
+        val selected = PowerSensorSettingsStore(FilePowerSensorSettingsStorage(this)).load()
+        if (selected == null) {
+            _powerSensorStatus.value = PowerSensorRecordingStatus.NOT_CONFIGURED
+            return
+        }
         val sensor = KablePowerSensor(scope)
         powerSensor = sensor
         powerSampleJob = scope.launch {
@@ -237,7 +247,9 @@ class TrackRecordingService : Service() {
             }
         }
         powerSensorJob = scope.launch {
-            sensor.connect(selected.id)
+            PowerSensorReconnectManager(sensor).run(selected.id) { status ->
+                _powerSensorStatus.value = status
+            }
         }
     }
 
@@ -248,6 +260,7 @@ class TrackRecordingService : Service() {
         powerSampleJob = null
         val sensor = powerSensor
         powerSensor = null
+        _powerSensorStatus.value = PowerSensorRecordingStatus.NOT_CONNECTED
         if (sensor != null) scope.launch { sensor.disconnect() }
     }
 
@@ -310,6 +323,11 @@ class TrackRecordingService : Service() {
 
         /** Outcome of saving the most recently stopped recording; cleared when a new one starts. */
         val lastSaveMessage: StateFlow<String?> = _lastSaveMessage
+
+        private val _powerSensorStatus =
+            MutableStateFlow(PowerSensorRecordingStatus.NOT_CONFIGURED)
+
+        val powerSensorStatus: StateFlow<PowerSensorRecordingStatus> = _powerSensorStatus
 
         fun start(context: Context) {
             ContextCompat.startForegroundService(context, intent(context, ACTION_START))

@@ -194,6 +194,25 @@ class TrackRecorderTest {
     }
 
     @Test
+    fun leavesPowerGapDuringDisconnectAndResumesWithFreshSample() {
+        val recorder = TrackRecorder(TrackRecorderConfig(powerSampleTimeoutMillis = 3_000))
+        recorder.start(T0)
+        recorder.onPower(PowerSample(210, 82.0), T0 + 500)
+        recorder.onLocation(sample(secondsAfterStart = 1, latitude = 55.0))
+
+        // No power notifications while disconnected: the old sample must expire.
+        recorder.onLocation(sample(secondsAfterStart = 5, latitude = 55.001))
+
+        // A notification after reconnect is merged normally again.
+        recorder.onPower(PowerSample(260, 90.0), T0 + 5_500)
+        recorder.onLocation(sample(secondsAfterStart = 6, latitude = 55.002))
+
+        val points = recorder.stop(T0 + 7_000).document.tracks.single().segments.single().points
+        assertEquals(listOf(210, null, 260), points.map { it.powerWatts })
+        assertEquals(listOf(82, null, 90), points.map { it.cadenceRpm })
+    }
+
+    @Test
     fun emptyRecordingProducesDocumentWithoutTracks() {
         val recorder = TrackRecorder()
         recorder.start(atEpochMillis = T0)
