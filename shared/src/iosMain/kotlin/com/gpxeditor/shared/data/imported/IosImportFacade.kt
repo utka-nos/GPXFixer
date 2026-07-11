@@ -222,7 +222,7 @@ class IosImportFacade {
 }
 
 @OptIn(ExperimentalForeignApi::class)
-private class IosGpxTrackFileStorage : GpxTrackFileStorage {
+internal class IosGpxTrackFileStorage : GpxTrackFileStorage {
     private val rootDirectory = documentsDirectory()
 
     override suspend fun save(storageKey: String, content: String) {
@@ -272,7 +272,7 @@ private class IosGpxTrackFileStorage : GpxTrackFileStorage {
 }
 
 @OptIn(ExperimentalForeignApi::class)
-private class IosImportedTrackStore : ImportedTrackStore {
+internal class IosImportedTrackStore : ImportedTrackStore {
     private val metadataUrl = documentsDirectory()
         .URLByAppendingPathComponent(FILE_NAME)
         ?: error("Invalid metadata URL")
@@ -366,11 +366,11 @@ private class IosImportedTrackStore : ImportedTrackStore {
     }
 }
 
-private class IosImportIdGenerator : ImportIdGenerator {
+internal class IosImportIdGenerator : ImportIdGenerator {
     override fun nextId(): String = NSUUID().UUIDString()
 }
 
-private class IosImportClock : ImportClock {
+internal class IosImportClock : ImportClock {
     private val formatter = NSISO8601DateFormatter()
 
     override fun nowIsoString(): String {
@@ -402,14 +402,14 @@ private fun ByteArray.toNSData(): NSData {
 }
 
 @OptIn(ExperimentalForeignApi::class)
-private fun documentsDirectory(): NSURL {
+internal fun documentsDirectory(): NSURL {
     return NSFileManager.defaultManager
         .URLsForDirectory(NSDocumentDirectory, NSUserDomainMask)
         .first() as? NSURL
         ?: error("Could not resolve documents directory")
 }
 
-private fun <T> runSuspendBlocking(block: suspend () -> T): T {
+internal fun <T> runSuspendBlocking(block: suspend () -> T): T {
     var value: T? = null
     var failure: Throwable? = null
 
