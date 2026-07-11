@@ -22,14 +22,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.gpxeditor.android.EmptyHistory
 import com.gpxeditor.android.ImportScreenState
-import com.gpxeditor.android.formatDistance
-import com.gpxeditor.android.ImportedTrackRow
-import com.gpxeditor.android.RecordingScreen
 import com.gpxeditor.android.recording.PowerSensorController
-import com.gpxeditor.android.TrackDetailScreen
-import com.gpxeditor.android.TrackTrimScreen
 import com.gpxeditor.shared.domain.activity.ActivityDocument
 import com.gpxeditor.shared.domain.imported.ImportedTrack
 import com.gpxeditor.shared.feature.edittrack.DeleteGpxTrackPointResult
