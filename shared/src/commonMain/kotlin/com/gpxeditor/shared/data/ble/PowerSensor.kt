@@ -7,11 +7,20 @@ interface PowerSensor {
     val connectionState: StateFlow<PowerSensorConnectionState>
     val samples: Flow<PowerSample>
 
-    /** Scans for the first Cycling Power Service advertiser and connects to it. */
-    suspend fun connect()
+    /** Emits nearby devices advertising the Cycling Power Service. */
+    fun scan(): Flow<PowerSensorDevice>
+
+    /** Scans for [sensorId] (or the first power sensor when null) and connects to it. */
+    suspend fun connect(sensorId: String? = null)
 
     suspend fun disconnect()
 }
+
+data class PowerSensorDevice(
+    val id: String,
+    val name: String?,
+    val rssi: Int,
+)
 
 sealed interface PowerSensorConnectionState {
     data object Disconnected : PowerSensorConnectionState

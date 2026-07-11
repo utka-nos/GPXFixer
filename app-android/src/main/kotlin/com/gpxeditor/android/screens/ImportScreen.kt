@@ -27,6 +27,7 @@ import com.gpxeditor.android.ImportScreenState
 import com.gpxeditor.android.formatDistance
 import com.gpxeditor.android.ImportedTrackRow
 import com.gpxeditor.android.RecordingScreen
+import com.gpxeditor.android.recording.PowerSensorController
 import com.gpxeditor.android.TrackDetailScreen
 import com.gpxeditor.android.TrackTrimScreen
 import com.gpxeditor.shared.domain.activity.ActivityDocument
@@ -57,9 +58,11 @@ fun ImportScreen(
     onRecordingClosed: () -> Unit,
     onRestoreRecording: () -> Unit,
     onDiscardRecording: () -> Unit,
+    powerSensorController: PowerSensorController,
 ) {
     var trackPendingDelete by remember { mutableStateOf<ImportedTrack?>(null) }
     var isRecordingOpen by remember { mutableStateOf(false) }
+    var isSensorsOpen by remember { mutableStateOf(false) }
 
     MaterialTheme {
         Surface(modifier = Modifier.fillMaxSize()) {
@@ -69,6 +72,14 @@ fun ImportScreen(
                         isRecordingOpen = false
                         onRecordingClosed()
                     },
+                )
+                return@Surface
+            }
+
+            if (isSensorsOpen) {
+                PowerSensorScreen(
+                    controller = powerSensorController,
+                    onBackClick = { isSensorsOpen = false },
                 )
                 return@Surface
             }
@@ -142,6 +153,9 @@ fun ImportScreen(
                     }
                     Button(onClick = { isRecordingOpen = true }) {
                         Text("Record")
+                    }
+                    Button(onClick = { isSensorsOpen = true }) {
+                        Text("Sensors")
                     }
                     if (state.isImporting) {
                         CircularProgressIndicator()
