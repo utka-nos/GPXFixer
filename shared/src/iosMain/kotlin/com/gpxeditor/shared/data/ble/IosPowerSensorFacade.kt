@@ -55,6 +55,7 @@ class IosPowerSensorFacade {
     private val sensor = KablePowerSensor(scope)
     private val settings = PowerSensorSettingsStore(IosPowerSensorSettingsStorage())
     private var scanJob: Job? = null
+    private var sampleJob: Job? = null
 
     fun selectedSensor(): SelectedPowerSensor? = settings.load()
 
@@ -96,12 +97,16 @@ class IosPowerSensorFacade {
         scope.launch { sensor.disconnect() }
     }
 
-    fun connectSaved() {
+    fun connectSaved(onSample: (PowerSample) -> Unit) {
         val selected = settings.load() ?: return
+        sampleJob?.cancel()
+        sampleJob = scope.launch { sensor.samples.collect(onSample) }
         scope.launch { sensor.connect(selected.id) }
     }
 
     fun disconnect() {
+        sampleJob?.cancel()
+        sampleJob = null
         scope.launch { sensor.disconnect() }
     }
 

@@ -28,6 +28,9 @@ fun SummarySection(
         DetailRow("Elevation gain", formatElevation(summary.totalAscentMeters))
         DetailRow("Elevation loss", formatElevation(summary.totalDescentMeters))
         DetailRow("Elevation range", formatElevationRange(summary.minElevationMeters, summary.maxElevationMeters))
+        summary.averagePowerWatts?.let { DetailRow("Average power", "${it.toInt()} W") }
+        summary.maxPowerWatts?.let { DetailRow("Maximum power", "$it W") }
+        summary.averageCadenceRpm?.let { DetailRow("Average cadence", "${it.toInt()} rpm") }
         DetailRow("Time range", formatTimeRange(summary.startTime, summary.endTime))
         DetailRow("Start", formatCoordinate(summary.startCoordinate))
         DetailRow("Finish", formatCoordinate(summary.endCoordinate))

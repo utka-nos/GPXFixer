@@ -7,6 +7,8 @@ import com.gpxeditor.shared.domain.activity.ActivityMetadata
 import com.gpxeditor.shared.domain.activity.ActivityPoint
 import com.gpxeditor.shared.domain.activity.ActivitySegment
 import com.gpxeditor.shared.domain.activity.ActivityTrack
+import com.gpxeditor.shared.data.ble.PowerSample
+import kotlin.math.roundToInt
 
 /**
  * Records incoming [LocationSample]s into an [ActivityDocument].
@@ -29,6 +31,7 @@ class TrackRecorder(
     private var completedActiveMillis = 0L
     private var activeSpanStartMillis: Long? = null
     private var pointCount = 0
+    private var latestPower: TimedPowerSample? = null
 
     fun start(atEpochMillis: Long) {
         check(state == RecordingState.IDLE) { "Recording can only be started from the idle state." }
@@ -87,10 +90,14 @@ class TrackRecorder(
             currentSpeedMetersPerSecond = sample.speedMetersPerSecond
         }
 
-        segments.last() += sample.toActivityPoint()
+        segments.last() += sample.toActivityPoint(powerAt(sample.epochMillis))
         lastAcceptedSample = sample
         pointCount += 1
         return true
+    }
+
+    fun onPower(sample: PowerSample, atEpochMillis: Long) {
+        latestPower = TimedPowerSample(sample, atEpochMillis)
     }
 
     fun stats(nowEpochMillis: Long): RecordingStats {
@@ -104,6 +111,8 @@ class TrackRecorder(
             distanceMeters = distanceMeters,
             currentSpeedMetersPerSecond = currentSpeedMetersPerSecond,
             pointCount = pointCount,
+            currentPowerWatts = powerAt(nowEpochMillis)?.watts,
+            currentCadenceRpm = powerAt(nowEpochMillis)?.cadenceRpm?.roundToInt(),
         )
     }
 
@@ -120,13 +129,21 @@ class TrackRecorder(
         return accuracy == null || accuracy <= config.maxHorizontalAccuracyMeters
     }
 
-    private fun LocationSample.toActivityPoint(): ActivityPoint {
+    private fun powerAt(epochMillis: Long): PowerSample? {
+        val timed = latestPower ?: return null
+        val ageMillis = epochMillis - timed.epochMillis
+        return timed.sample.takeIf { ageMillis in 0..config.powerSampleTimeoutMillis }
+    }
+
+    private fun LocationSample.toActivityPoint(power: PowerSample?): ActivityPoint {
         return ActivityPoint(
             time = unixSecondsToIso(epochMillis.floorDiv(1000L)),
             latitude = latitude,
             longitude = longitude,
             elevationMeters = elevationMeters,
             speedMetersPerSecond = speedMetersPerSecond,
+            powerWatts = power?.watts,
+            cadenceRpm = power?.cadenceRpm?.roundToInt(),
         )
     }
 
@@ -154,6 +171,7 @@ class TrackRecorder(
 data class TrackRecorderConfig(
     val sport: String = "cycling",
     val maxHorizontalAccuracyMeters: Double = 50.0,
+    val powerSampleTimeoutMillis: Long = 5_000L,
 )
 
 enum class RecordingState {
@@ -169,7 +187,11 @@ data class RecordingStats(
     val distanceMeters: Double,
     val currentSpeedMetersPerSecond: Double?,
     val pointCount: Int,
+    val currentPowerWatts: Int?,
+    val currentCadenceRpm: Int?,
 )
+
+private data class TimedPowerSample(val sample: PowerSample, val epochMillis: Long)
 
 data class RecordedActivity(
     val document: ActivityDocument,

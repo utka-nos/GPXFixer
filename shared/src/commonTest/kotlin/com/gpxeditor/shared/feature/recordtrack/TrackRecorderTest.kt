@@ -1,5 +1,7 @@
 package com.gpxeditor.shared.feature.recordtrack
 
+import com.gpxeditor.shared.data.ble.PowerSample
+
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -150,6 +152,45 @@ class TrackRecorderTest {
         assertNull(point.heartRateBpm)
         assertNull(point.powerWatts)
         assertNull(point.cadenceRpm)
+    }
+
+    @Test
+    fun mergesLatestPowerIntoRecordedLocationsAndStats() {
+        val recorder = TrackRecorder()
+        recorder.start(atEpochMillis = T0)
+        recorder.onPower(PowerSample(watts = 247, cadenceRpm = 91.6), atEpochMillis = T0 + 900)
+
+        recorder.onLocation(sample(secondsAfterStart = 1, latitude = 55.0))
+
+        val stats = recorder.stats(T0 + 1_100)
+        assertEquals(247, stats.currentPowerWatts)
+        assertEquals(92, stats.currentCadenceRpm)
+        val point = recorder.stop(T0 + 2_000).document.tracks.single().segments.single().points.single()
+        assertEquals(247, point.powerWatts)
+        assertEquals(92, point.cadenceRpm)
+    }
+
+    @Test
+    fun doesNotMergeStaleOrFuturePowerSamples() {
+        val recorder = TrackRecorder(TrackRecorderConfig(powerSampleTimeoutMillis = 4_000))
+        recorder.start(atEpochMillis = T0)
+        recorder.onPower(PowerSample(watts = 200, cadenceRpm = 80.0), atEpochMillis = T0 + 1_000)
+
+        recorder.onLocation(sample(secondsAfterStart = 5, latitude = 55.0))
+        recorder.onLocation(sample(secondsAfterStart = 6, latitude = 55.001))
+
+        val points = recorder.stop(T0 + 7_000).document.tracks.single().segments.single().points
+        assertEquals(200, points[0].powerWatts)
+        assertNull(points[1].powerWatts)
+        assertNull(points[1].cadenceRpm)
+        assertNull(recorder.stats(T0 + 7_000).currentPowerWatts)
+
+        val futureRecorder = TrackRecorder()
+        futureRecorder.start(T0)
+        futureRecorder.onPower(PowerSample(300, 100.0), T0 + 2_000)
+        futureRecorder.onLocation(sample(secondsAfterStart = 1, latitude = 55.0))
+        val futurePoint = futureRecorder.stop(T0 + 3_000).document.tracks.single().segments.single().points.single()
+        assertNull(futurePoint.powerWatts)
     }
 
     @Test

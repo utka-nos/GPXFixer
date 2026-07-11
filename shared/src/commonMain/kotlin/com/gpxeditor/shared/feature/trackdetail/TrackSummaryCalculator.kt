@@ -10,6 +10,8 @@ object TrackSummaryCalculator {
         val points = segments.flatMap { it.points }
         val elevations = points.mapNotNull { it.elevationMeters }
         val times = points.mapNotNull { it.time?.takeIf(String::isNotBlank) }
+        val powers = points.mapNotNull { it.powerWatts }
+        val cadences = points.mapNotNull { it.cadenceRpm }
 
         return TrackSummary(
             trackCount = document.tracks.size,
@@ -20,6 +22,9 @@ object TrackSummaryCalculator {
             totalDescentMeters = elevationGain(points, onlyPositive = false),
             minElevationMeters = elevations.minOrNull(),
             maxElevationMeters = elevations.maxOrNull(),
+            averagePowerWatts = powers.takeIf { it.isNotEmpty() }?.average(),
+            maxPowerWatts = powers.maxOrNull(),
+            averageCadenceRpm = cadences.takeIf { it.isNotEmpty() }?.average(),
             startTime = times.firstOrNull(),
             endTime = times.lastOrNull(),
             startCoordinate = points.firstCoordinateOrNull(),

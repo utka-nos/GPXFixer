@@ -152,6 +152,8 @@ private fun ActiveRecordingContent(
     StatRow(label = "Distance", value = formatDistance(stats.distanceMeters))
     StatRow(label = "Speed", value = formatSpeed(stats.currentSpeedMetersPerSecond))
     StatRow(label = "Points", value = stats.pointCount.toString())
+    StatRow(label = "Power", value = stats.currentPowerWatts?.let { "$it W" } ?: "—")
+    StatRow(label = "Cadence", value = stats.currentCadenceRpm?.let { "$it rpm" } ?: "—")
 
     when {
         stats.state == RecordingState.PAUSED -> {
