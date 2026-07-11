@@ -3,6 +3,7 @@ import shared
 
 struct IOSImportScreen: View {
     @StateObject private var viewModel = IOSImportViewModel()
+    @ObservedObject private var recordingSession = RecordingSession.shared
     @State private var isShowingImporter = false
 
     var body: some View {
@@ -15,6 +16,15 @@ struct IOSImportScreen: View {
                         Label("Import track", systemImage: "square.and.arrow.down")
                     }
                     .disabled(viewModel.isImporting)
+
+                    NavigationLink {
+                        IOSRecordingScreen()
+                    } label: {
+                        Label(
+                            recordingSession.isRecording ? "Recording…" : "Record track",
+                            systemImage: "record.circle"
+                        )
+                    }
 
                     if viewModel.isImporting {
                         ProgressView("Importing")
@@ -58,6 +68,35 @@ struct IOSImportScreen: View {
             }
             .onAppear {
                 viewModel.loadHistory()
+                recordingSession.checkForUnfinishedRecording()
+            }
+            .alert(
+                "Unfinished recording found",
+                isPresented: Binding(
+                    get: { recordingSession.recoveredRecording != nil },
+                    set: { isPresented in
+                        if !isPresented {
+                            recordingSession.discardRecoveredRecording()
+                        }
+                    }
+                ),
+                presenting: recordingSession.recoveredRecording
+            ) { _ in
+                Button("Restore") {
+                    recordingSession.restoreRecoveredRecording { message in
+                        viewModel.statusMessage = message
+                        viewModel.loadHistory()
+                    }
+                }
+                Button("Discard", role: .destructive) {
+                    recordingSession.discardRecoveredRecording()
+                }
+            } message: { recovered in
+                Text(
+                    "A recording was interrupted before it could be saved: "
+                        + "\(recovered.stats.pointCount) points, "
+                        + "\(formatDistance(recovered.stats.distanceMeters)). Restore it?"
+                )
             }
         }
     }

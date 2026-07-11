@@ -21,6 +21,22 @@ func formatDistance(_ meters: Double) -> String {
     return String(format: "%.0f m", meters)
 }
 
+func formatDuration(_ millis: Int64) -> String {
+    let totalSeconds = millis / 1_000
+    let hours = totalSeconds / 3_600
+    let minutes = (totalSeconds % 3_600) / 60
+    let seconds = totalSeconds % 60
+    return String(format: "%02d:%02d:%02d", hours, minutes, seconds)
+}
+
+func formatSpeed(_ metersPerSecond: KotlinDouble?) -> String {
+    guard let metersPerSecond else {
+        return "—"
+    }
+
+    return String(format: "%.1f km/h", metersPerSecond.doubleValue * 3.6)
+}
+
 func formatElevation(_ meters: KotlinDouble?) -> String {
     guard let meters else {
         return "No data"
