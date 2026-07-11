@@ -56,7 +56,11 @@ final class RecordingSession: NSObject, ObservableObject, CLLocationManagerDeleg
 
         let startedAt = nowMillis()
         let startedRecorder = TrackRecorder(
-            config: TrackRecorderConfig(sport: "cycling", maxHorizontalAccuracyMeters: 50.0)
+            config: TrackRecorderConfig(
+                sport: "cycling",
+                maxHorizontalAccuracyMeters: 50.0,
+                powerSampleTimeoutMillis: 5_000
+            )
         )
         recorder = startedRecorder
         startedRecorder.start(atEpochMillis: startedAt)
@@ -69,7 +73,11 @@ final class RecordingSession: NSObject, ObservableObject, CLLocationManagerDeleg
         manager.allowsBackgroundLocationUpdates = true
         manager.showsBackgroundLocationIndicator = true
         manager.startUpdatingLocation()
-        powerSensorFacade.connectSaved()
+        powerSensorFacade.connectSaved { [weak self] sample in
+            guard let self, let recorder = self.recorder else { return }
+            recorder.onPower(sample: sample, atEpochMillis: self.nowMillis())
+            self.publishStats()
+        }
         startTicker()
         publishStats()
     }

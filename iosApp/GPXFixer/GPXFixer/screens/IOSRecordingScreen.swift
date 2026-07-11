@@ -64,6 +64,8 @@ struct IOSRecordingScreen: View {
                 statRow("Distance", formatDistance(stats.distanceMeters))
                 statRow("Speed", formatSpeed(stats.currentSpeedMetersPerSecond))
                 statRow("Points", "\(stats.pointCount)")
+                statRow("Power", stats.currentPowerWatts.map { "\($0.intValue) W" } ?? "—")
+                statRow("Cadence", stats.currentCadenceRpm.map { "\($0.intValue) rpm" } ?? "—")
 
                 if stats.state == RecordingState.paused {
                     Text("Paused")

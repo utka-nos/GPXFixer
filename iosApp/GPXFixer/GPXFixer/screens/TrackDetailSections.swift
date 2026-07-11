@@ -62,6 +62,15 @@ struct SummarySection: View {
                 label: "Elevation range",
                 value: formatElevationRange(summary.minElevationMeters, summary.maxElevationMeters)
             )
+            if let averagePower = summary.averagePowerWatts {
+                DetailRow(label: "Average power", value: "\(Int(averagePower.doubleValue)) W")
+            }
+            if let maxPower = summary.maxPowerWatts {
+                DetailRow(label: "Maximum power", value: "\(maxPower.intValue) W")
+            }
+            if let averageCadence = summary.averageCadenceRpm {
+                DetailRow(label: "Average cadence", value: "\(Int(averageCadence.doubleValue)) rpm")
+            }
             DetailRow(label: "Time range", value: formatTimeRange(summary.startTime, summary.endTime))
             DetailRow(label: "Start", value: formatCoordinate(summary.startCoordinate))
             DetailRow(label: "Finish", value: formatCoordinate(summary.endCoordinate))

@@ -58,6 +58,7 @@ class TrackRecordingService : Service() {
     private var tickerJob: Job? = null
     private var powerSensor: KablePowerSensor? = null
     private var powerSensorJob: Job? = null
+    private var powerSampleJob: Job? = null
 
     // Single-threaded so journal lines land in order; also runs the final save.
     private val journalExecutor = Executors.newSingleThreadExecutor()
@@ -94,6 +95,8 @@ class TrackRecordingService : Service() {
     override fun onDestroy() {
         powerSensorJob?.cancel()
         powerSensorJob = null
+        powerSampleJob?.cancel()
+        powerSampleJob = null
         scope.cancel()
         journalExecutor.shutdown()
         if (recorder != null) {
@@ -227,6 +230,12 @@ class TrackRecordingService : Service() {
         val selected = PowerSensorSettingsStore(FilePowerSensorSettingsStorage(this)).load() ?: return
         val sensor = KablePowerSensor(scope)
         powerSensor = sensor
+        powerSampleJob = scope.launch {
+            sensor.samples.collect { sample ->
+                recorder?.onPower(sample, now())
+                publishStats()
+            }
+        }
         powerSensorJob = scope.launch {
             sensor.connect(selected.id)
         }
@@ -235,6 +244,8 @@ class TrackRecordingService : Service() {
     private fun stopPowerSensor() {
         powerSensorJob?.cancel()
         powerSensorJob = null
+        powerSampleJob?.cancel()
+        powerSampleJob = null
         val sensor = powerSensor
         powerSensor = null
         if (sensor != null) scope.launch { sensor.disconnect() }
@@ -256,12 +267,20 @@ class TrackRecordingService : Service() {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_recording)
             .setContentTitle(stateText)
-            .setContentText("${formatDuration(stats.elapsedMillis)} • ${formatDistance(stats.distanceMeters)}")
+            .setContentText(buildNotificationText(stats))
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setSilent(true)
             .setCategory(NotificationCompat.CATEGORY_WORKOUT)
             .build()
+    }
+
+    private fun buildNotificationText(stats: RecordingStats): String = buildString {
+        append(formatDuration(stats.elapsedMillis))
+        append(" • ")
+        append(formatDistance(stats.distanceMeters))
+        stats.currentPowerWatts?.let { append(" • $it W") }
+        stats.currentCadenceRpm?.let { append(" • $it rpm") }
     }
 
     private fun createNotificationChannel() {

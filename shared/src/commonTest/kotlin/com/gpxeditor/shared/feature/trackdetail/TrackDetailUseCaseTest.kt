@@ -1,6 +1,11 @@
 package com.gpxeditor.shared.feature.trackdetail
 
 import com.gpxeditor.shared.domain.imported.ImportedTrack
+import com.gpxeditor.shared.data.activity.ActivityDocumentJson
+import com.gpxeditor.shared.domain.activity.ActivityDocument
+import com.gpxeditor.shared.domain.activity.ActivityPoint
+import com.gpxeditor.shared.domain.activity.ActivitySegment
+import com.gpxeditor.shared.domain.activity.ActivityTrack
 import com.gpxeditor.shared.domain.imported.ports.GpxTrackFileStorage
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.EmptyCoroutineContext
@@ -96,6 +101,34 @@ class TrackDetailUseCaseTest {
             ),
             detail.warnings,
         )
+    }
+
+    @Test
+    fun summarizesRecordedPowerAndCadence() = runSuspend {
+        val document = ActivityDocument(
+            tracks = listOf(
+                ActivityTrack(
+                    segments = listOf(
+                        ActivitySegment(
+                            points = listOf(
+                                ActivityPoint(powerWatts = 200, cadenceRpm = 80),
+                                ActivityPoint(powerWatts = 300, cadenceRpm = 90),
+                                ActivityPoint(),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        )
+        val storage = FakeGpxTrackFileStorage(
+            "tracks/track-1.gpx" to ActivityDocumentJson.serialize(document),
+        )
+
+        val detail = assertIs<TrackDetailResult.Success>(TrackDetailUseCase(storage)(importedTrack())).detail
+
+        assertEquals(250.0, detail.summary.averagePowerWatts)
+        assertEquals(300, detail.summary.maxPowerWatts)
+        assertEquals(85.0, detail.summary.averageCadenceRpm)
     }
 
     @Test
