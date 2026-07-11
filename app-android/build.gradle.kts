@@ -54,6 +54,7 @@ dependencies {
     implementation(compose.material3)
     implementation(compose.ui)
     implementation(libs.google.maps.compose)
+    implementation(libs.play.services.location)
 
     debugImplementation(compose.uiTooling)
 }
