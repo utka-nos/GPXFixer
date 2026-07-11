@@ -50,6 +50,8 @@
 	<true/>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>GPXFixer uses your location to record your track while you ride.</string>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>GPXFixer uses Bluetooth to connect to your cycling power meter.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>location</string>
