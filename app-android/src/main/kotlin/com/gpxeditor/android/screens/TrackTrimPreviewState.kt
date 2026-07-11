@@ -1,4 +1,4 @@
-package com.gpxeditor.android
+package com.gpxeditor.android.screens
 
 import com.gpxeditor.shared.domain.activity.ActivityDocument
 import com.gpxeditor.shared.feature.edittrack.TrimGpxTrackResult

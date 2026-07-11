@@ -1,4 +1,4 @@
-package com.gpxeditor.android
+package com.gpxeditor.android.screens
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -27,7 +27,9 @@ fun SummarySection(
         DetailRow("Distance", formatDistance(summary.distanceMeters))
         DetailRow("Elevation gain", formatElevation(summary.totalAscentMeters))
         DetailRow("Elevation loss", formatElevation(summary.totalDescentMeters))
-        DetailRow("Elevation range", formatElevationRange(summary.minElevationMeters, summary.maxElevationMeters))
+        DetailRow("Elevation range",
+            formatElevationRange(summary.minElevationMeters, summary.maxElevationMeters)
+        )
         summary.averagePowerWatts?.let { DetailRow("Average power", "${it.toInt()} W") }
         summary.maxPowerWatts?.let { DetailRow("Maximum power", "$it W") }
         summary.averageCadenceRpm?.let { DetailRow("Average cadence", "${it.toInt()} rpm") }

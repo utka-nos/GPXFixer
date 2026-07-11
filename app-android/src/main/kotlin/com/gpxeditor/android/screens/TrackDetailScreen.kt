@@ -1,4 +1,4 @@
-package com.gpxeditor.android
+package com.gpxeditor.android.screens
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box

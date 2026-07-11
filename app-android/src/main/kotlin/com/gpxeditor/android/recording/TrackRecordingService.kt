@@ -9,6 +9,7 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
@@ -18,8 +19,8 @@ import com.gpxeditor.android.data.imported.AndroidImportClock
 import com.gpxeditor.android.data.imported.AndroidImportIdGenerator
 import com.gpxeditor.android.data.imported.JsonImportedTrackStore
 import com.gpxeditor.android.data.location.AndroidLocationSource
-import com.gpxeditor.android.formatDistance
-import com.gpxeditor.android.formatDuration
+import com.gpxeditor.android.screens.formatDistance
+import com.gpxeditor.android.screens.formatDuration
 import com.gpxeditor.shared.feature.recordtrack.LocationSource
 import com.gpxeditor.shared.feature.recordtrack.RecordedActivity
 import com.gpxeditor.shared.feature.recordtrack.RecordingJournal
@@ -83,6 +84,7 @@ class TrackRecordingService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        Log.i(RecordingPermissions.TAG, "Service onStartCommand action=${intent?.action}")
         when (intent?.action) {
             ACTION_START -> startRecording()
             ACTION_PAUSE -> pauseRecording()
@@ -109,8 +111,16 @@ class TrackRecordingService : Service() {
     }
 
     private fun startRecording() {
-        if (recorder != null) return
+        if (recorder != null) {
+            Log.i(RecordingPermissions.TAG, "startRecording ignored: recording already active")
+            return
+        }
         if (!RecordingPermissions.allGranted(this)) {
+            Log.w(
+                RecordingPermissions.TAG,
+                "startRecording aborted, missing: ${RecordingPermissions.missing(this)}",
+            )
+            RecordingPermissions.logStatus(this, "service start")
             stopSelf()
             return
         }
@@ -136,6 +146,7 @@ class TrackRecordingService : Service() {
             },
         )
 
+        Log.i(RecordingPermissions.TAG, "Recording started in foreground service")
         startLocationUpdates()
         startPowerSensor()
         tickerJob = scope.launch {

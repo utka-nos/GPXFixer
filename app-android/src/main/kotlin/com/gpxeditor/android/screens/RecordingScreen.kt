@@ -1,4 +1,4 @@
-package com.gpxeditor.android
+package com.gpxeditor.android.screens
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -22,6 +22,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import android.util.Log
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -41,10 +42,19 @@ fun RecordingScreen(onBackClick: () -> Unit) {
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
-    ) {
+    ) { results ->
+        // An empty result or immediate denial without a dialog means the permission
+        // is permanently denied and can only be granted from system settings.
+        Log.i(RecordingPermissions.TAG, "Permission dialog result: $results")
+        RecordingPermissions.logStatus(context, "permission result")
         permissionsGranted = RecordingPermissions.allGranted(context)
         if (permissionsGranted) {
             TrackRecordingService.start(context)
+        } else {
+            Log.w(
+                RecordingPermissions.TAG,
+                "Recording not started, missing: ${RecordingPermissions.missing(context)}",
+            )
         }
     }
 
@@ -79,10 +89,16 @@ fun RecordingScreen(onBackClick: () -> Unit) {
             IdleContent(
                 permissionsGranted = permissionsGranted,
                 onStartClick = {
+                    RecordingPermissions.logStatus(context, "start click")
                     if (RecordingPermissions.allGranted(context)) {
                         permissionsGranted = true
+                        Log.i(RecordingPermissions.TAG, "Starting recording service")
                         TrackRecordingService.start(context)
                     } else {
+                        Log.i(
+                            RecordingPermissions.TAG,
+                            "Requesting permissions: ${RecordingPermissions.missing(context)}",
+                        )
                         permissionLauncher.launch(RecordingPermissions.required())
                     }
                 },

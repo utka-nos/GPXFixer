@@ -1,4 +1,4 @@
-package com.gpxeditor.android
+package com.gpxeditor.android.screens
 
 import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
