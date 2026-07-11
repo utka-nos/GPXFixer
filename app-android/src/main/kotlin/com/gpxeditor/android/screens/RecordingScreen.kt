@@ -66,6 +66,14 @@ fun RecordingScreen(onBackClick: () -> Unit) {
 
         val currentStats = stats
         if (currentStats == null) {
+            val saveMessage by TrackRecordingService.lastSaveMessage.collectAsState()
+            saveMessage?.let { message ->
+                Text(
+                    text = message,
+                    color = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
             IdleContent(
                 permissionsGranted = permissionsGranted,
                 onStartClick = {

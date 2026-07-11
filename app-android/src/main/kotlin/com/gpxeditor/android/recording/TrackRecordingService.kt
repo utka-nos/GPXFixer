@@ -13,24 +13,35 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import com.gpxeditor.android.R
+import com.gpxeditor.android.data.imported.AndroidGpxTrackFileStorage
+import com.gpxeditor.android.data.imported.AndroidImportClock
+import com.gpxeditor.android.data.imported.AndroidImportIdGenerator
+import com.gpxeditor.android.data.imported.JsonImportedTrackStore
 import com.gpxeditor.android.data.location.AndroidLocationSource
 import com.gpxeditor.android.formatDistance
 import com.gpxeditor.android.formatDuration
 import com.gpxeditor.shared.feature.recordtrack.LocationSource
 import com.gpxeditor.shared.feature.recordtrack.RecordedActivity
+import com.gpxeditor.shared.feature.recordtrack.RecordingJournal
 import com.gpxeditor.shared.feature.recordtrack.RecordingState
 import com.gpxeditor.shared.feature.recordtrack.RecordingStats
+import com.gpxeditor.shared.feature.recordtrack.SaveRecordedTrackRequest
+import com.gpxeditor.shared.feature.recordtrack.SaveRecordedTrackResult
+import com.gpxeditor.shared.feature.recordtrack.SaveRecordedTrackUseCase
 import com.gpxeditor.shared.feature.recordtrack.TrackRecorder
+import java.util.concurrent.Executors
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Foreground service that owns the [TrackRecorder] and its [LocationSource]
@@ -43,6 +54,19 @@ class TrackRecordingService : Service() {
     private var recorder: TrackRecorder? = null
     private var locationJob: Job? = null
     private var tickerJob: Job? = null
+
+    // Single-threaded so journal lines land in order; also runs the final save.
+    private val journalExecutor = Executors.newSingleThreadExecutor()
+    private val journalDispatcher = journalExecutor.asCoroutineDispatcher()
+    private val journal by lazy { FileRecordingJournal(applicationContext) }
+    private val saveRecordedTrackUseCase by lazy {
+        SaveRecordedTrackUseCase(
+            fileStorage = AndroidGpxTrackFileStorage(applicationContext),
+            trackStore = JsonImportedTrackStore(applicationContext),
+            idGenerator = AndroidImportIdGenerator(),
+            clock = AndroidImportClock(),
+        )
+    }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -65,6 +89,7 @@ class TrackRecordingService : Service() {
 
     override fun onDestroy() {
         scope.cancel()
+        journalExecutor.shutdown()
         if (recorder != null) {
             recorder = null
             _stats.value = null
@@ -79,9 +104,15 @@ class TrackRecordingService : Service() {
             return
         }
 
+        _lastSaveMessage.value = null
+        val startedAt = now()
         val startedRecorder = TrackRecorder()
         recorder = startedRecorder
-        startedRecorder.start(atEpochMillis = now())
+        startedRecorder.start(atEpochMillis = startedAt)
+        scope.launch(journalDispatcher) {
+            journal.clear()
+            journal.append(RecordingJournal.startLine(startedAt))
+        }
 
         ServiceCompat.startForeground(
             this,
@@ -107,7 +138,9 @@ class TrackRecordingService : Service() {
         val recorder = recorder ?: return
         if (recorder.state != RecordingState.RECORDING) return
 
-        recorder.pause(atEpochMillis = now())
+        val pausedAt = now()
+        recorder.pause(atEpochMillis = pausedAt)
+        appendToJournal { RecordingJournal.pauseLine(pausedAt) }
         stopLocationUpdates()
         publishStats()
     }
@@ -116,7 +149,9 @@ class TrackRecordingService : Service() {
         val recorder = recorder ?: return
         if (recorder.state != RecordingState.PAUSED) return
 
-        recorder.resume(atEpochMillis = now())
+        val resumedAt = now()
+        recorder.resume(atEpochMillis = resumedAt)
+        appendToJournal { RecordingJournal.resumeLine(resumedAt) }
         startLocationUpdates()
         publishStats()
     }
@@ -125,21 +160,51 @@ class TrackRecordingService : Service() {
         val recorder = recorder ?: return
         this.recorder = null
 
-        _lastRecording.value = recorder.stop(atEpochMillis = now())
+        val recorded = recorder.stop(atEpochMillis = now())
         _stats.value = null
-
         stopLocationUpdates()
         tickerJob?.cancel()
         tickerJob = null
-        ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
-        stopSelf()
+
+        scope.launch {
+            _lastSaveMessage.value = withContext(journalDispatcher) { saveRecording(recorded) }
+            ServiceCompat.stopForeground(this@TrackRecordingService, ServiceCompat.STOP_FOREGROUND_REMOVE)
+            stopSelf()
+        }
+    }
+
+    /** Saves the finished recording; the journal is kept on failure so recovery can retry. */
+    private suspend fun saveRecording(recorded: RecordedActivity): String {
+        return try {
+            when (val result = saveRecordedTrackUseCase(SaveRecordedTrackRequest(recorded.document))) {
+                is SaveRecordedTrackResult.Success -> {
+                    journal.clear()
+                    "Saved ${result.importedTrack.displayName}"
+                }
+
+                is SaveRecordedTrackResult.Failure -> {
+                    journal.clear()
+                    result.message
+                }
+            }
+        } catch (throwable: Throwable) {
+            "Failed to save recording: ${throwable.message}"
+        }
+    }
+
+    private fun appendToJournal(line: () -> String) {
+        scope.launch(journalDispatcher) {
+            journal.append(line())
+        }
     }
 
     private fun startLocationUpdates() {
         if (locationJob != null) return
         locationJob = scope.launch {
             AndroidLocationSource(this@TrackRecordingService).locations().collect { sample ->
-                recorder?.onLocation(sample)
+                if (recorder?.onLocation(sample) == true) {
+                    appendToJournal { RecordingJournal.pointLine(sample) }
+                }
             }
         }
     }
@@ -196,10 +261,10 @@ class TrackRecordingService : Service() {
         /** Live stats of the active recording, or null when nothing is being recorded. */
         val stats: StateFlow<RecordingStats?> = _stats
 
-        private val _lastRecording = MutableStateFlow<RecordedActivity?>(null)
+        private val _lastSaveMessage = MutableStateFlow<String?>(null)
 
-        /** Result of the most recently stopped recording; consumed by the save flow. */
-        val lastRecording: StateFlow<RecordedActivity?> = _lastRecording
+        /** Outcome of saving the most recently stopped recording; cleared when a new one starts. */
+        val lastSaveMessage: StateFlow<String?> = _lastSaveMessage
 
         fun start(context: Context) {
             ContextCompat.startForegroundService(context, intent(context, ACTION_START))
@@ -215,10 +280,6 @@ class TrackRecordingService : Service() {
 
         fun stop(context: Context) {
             context.startService(intent(context, ACTION_STOP))
-        }
-
-        fun consumeLastRecording(): RecordedActivity? {
-            return _lastRecording.value.also { _lastRecording.value = null }
         }
 
         private fun intent(context: Context, action: String): Intent {

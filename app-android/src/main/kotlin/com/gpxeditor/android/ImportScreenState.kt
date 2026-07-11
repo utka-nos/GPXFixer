@@ -1,6 +1,7 @@
 package com.gpxeditor.android
 
 import com.gpxeditor.shared.domain.imported.ImportedTrack
+import com.gpxeditor.shared.feature.recordtrack.RecordedActivity
 import com.gpxeditor.shared.feature.trackdetail.TrackDetail
 
 data class ImportScreenState(
@@ -10,6 +11,7 @@ data class ImportScreenState(
     val selectedTrackDetail: TrackDetail? = null,
     val trimTrackDetail: TrackDetail? = null,
     val editTrackDetail: TrackDetail? = null,
+    val recoveredRecording: RecordedActivity? = null,
     val statusMessage: String? = null,
     val errorMessage: String? = null,
 )

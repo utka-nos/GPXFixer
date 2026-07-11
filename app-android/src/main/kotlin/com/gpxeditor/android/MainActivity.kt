@@ -15,6 +15,8 @@ import com.gpxeditor.android.data.imported.AndroidGpxTrackFileStorage
 import com.gpxeditor.android.data.imported.AndroidImportClock
 import com.gpxeditor.android.data.imported.AndroidImportIdGenerator
 import com.gpxeditor.android.data.imported.JsonImportedTrackStore
+import com.gpxeditor.android.recording.FileRecordingJournal
+import com.gpxeditor.android.recording.TrackRecordingService
 import com.gpxeditor.android.screens.ImportScreen
 import com.gpxeditor.shared.data.fit.FitActivityDecoder
 import com.gpxeditor.shared.feature.deletetrack.DeleteImportedTrackUseCase
@@ -24,6 +26,7 @@ import com.gpxeditor.shared.feature.edittrack.TrimGpxTrackUseCase
 import com.gpxeditor.shared.feature.exportfit.ExportFitTrackUseCase
 import com.gpxeditor.shared.feature.importfit.ImportFitTrackUseCase
 import com.gpxeditor.shared.feature.importgpx.ImportGpxTrackUseCase
+import com.gpxeditor.shared.feature.recordtrack.SaveRecordedTrackUseCase
 import com.gpxeditor.shared.feature.renametrack.RenameTrackUseCase
 import com.gpxeditor.shared.feature.trackdetail.TrackDetailUseCase
 import java.io.File
@@ -63,6 +66,14 @@ class MainActivity : ComponentActivity() {
             ),
             deleteGpxTrackPointUseCase = DeleteGpxTrackPointUseCase(),
             moveGpxTrackPointUseCase = MoveGpxTrackPointUseCase(),
+            saveRecordedTrackUseCase = SaveRecordedTrackUseCase(
+                fileStorage = fileStorage,
+                trackStore = importedTrackStore,
+                idGenerator = importIdGenerator,
+                clock = importClock,
+            ),
+            recordingJournal = FileRecordingJournal(applicationContext),
+            isRecordingActive = { TrackRecordingService.stats.value != null },
             fileStorage = fileStorage,
             importedTrackStore = importedTrackStore,
             readTextFrom = ::readTextFrom,
@@ -107,10 +118,14 @@ class MainActivity : ComponentActivity() {
                 onDeleteTrackPoint = importScreenController::deleteTrackPoint,
                 onMoveTrackPoint = importScreenController::moveTrackPoint,
                 onSaveEditedTrack = importScreenController::saveEditedTrack,
+                onRecordingClosed = importScreenController::loadImportedTracks,
+                onRestoreRecording = importScreenController::restoreRecoveredRecording,
+                onDiscardRecording = importScreenController::discardRecoveredRecording,
             )
         }
 
         importScreenController.loadImportedTracks()
+        importScreenController.checkRecordingRecovery()
         handleViewIntent(intent)
     }
 

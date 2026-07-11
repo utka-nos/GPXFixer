@@ -24,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.gpxeditor.android.EmptyHistory
 import com.gpxeditor.android.ImportScreenState
+import com.gpxeditor.android.formatDistance
 import com.gpxeditor.android.ImportedTrackRow
 import com.gpxeditor.android.RecordingScreen
 import com.gpxeditor.android.TrackDetailScreen
@@ -53,6 +54,9 @@ fun ImportScreen(
     onDeleteTrackPoint: (ActivityDocument, Int) -> DeleteGpxTrackPointResult,
     onMoveTrackPoint: (ActivityDocument, Int, Double, Double) -> MoveGpxTrackPointResult,
     onSaveEditedTrack: (ActivityDocument) -> Unit,
+    onRecordingClosed: () -> Unit,
+    onRestoreRecording: () -> Unit,
+    onDiscardRecording: () -> Unit,
 ) {
     var trackPendingDelete by remember { mutableStateOf<ImportedTrack?>(null) }
     var isRecordingOpen by remember { mutableStateOf(false) }
@@ -60,7 +64,12 @@ fun ImportScreen(
     MaterialTheme {
         Surface(modifier = Modifier.fillMaxSize()) {
             if (isRecordingOpen) {
-                RecordingScreen(onBackClick = { isRecordingOpen = false })
+                RecordingScreen(
+                    onBackClick = {
+                        isRecordingOpen = false
+                        onRecordingClosed()
+                    },
+                )
                 return@Surface
             }
 
@@ -168,6 +177,30 @@ fun ImportScreen(
                         )
                     }
                 }
+            }
+
+            state.recoveredRecording?.let { recovered ->
+                AlertDialog(
+                    onDismissRequest = onDiscardRecording,
+                    title = { Text("Unfinished recording found") },
+                    text = {
+                        Text(
+                            "A recording was interrupted before it could be saved: " +
+                                "${recovered.stats.pointCount} points, " +
+                                "${formatDistance(recovered.stats.distanceMeters)}. Restore it?",
+                        )
+                    },
+                    confirmButton = {
+                        TextButton(onClick = onRestoreRecording) {
+                            Text("Restore")
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = onDiscardRecording) {
+                            Text("Discard", color = MaterialTheme.colorScheme.error)
+                        }
+                    },
+                )
             }
 
             trackPendingDelete?.let { track ->
