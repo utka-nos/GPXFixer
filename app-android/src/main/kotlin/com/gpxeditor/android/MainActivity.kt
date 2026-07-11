@@ -16,9 +16,13 @@ import com.gpxeditor.android.data.imported.AndroidImportClock
 import com.gpxeditor.android.data.imported.AndroidImportIdGenerator
 import com.gpxeditor.android.data.imported.JsonImportedTrackStore
 import com.gpxeditor.android.recording.FileRecordingJournal
+import com.gpxeditor.android.recording.FilePowerSensorSettingsStorage
+import com.gpxeditor.android.recording.PowerSensorController
 import com.gpxeditor.android.recording.TrackRecordingService
 import com.gpxeditor.android.screens.ImportScreen
 import com.gpxeditor.shared.data.fit.FitActivityDecoder
+import com.gpxeditor.shared.data.ble.KablePowerSensor
+import com.gpxeditor.shared.data.ble.PowerSensorSettingsStore
 import com.gpxeditor.shared.feature.deletetrack.DeleteImportedTrackUseCase
 import com.gpxeditor.shared.feature.edittrack.DeleteGpxTrackPointUseCase
 import com.gpxeditor.shared.feature.edittrack.MoveGpxTrackPointUseCase
@@ -30,10 +34,14 @@ import com.gpxeditor.shared.feature.recordtrack.SaveRecordedTrackUseCase
 import com.gpxeditor.shared.feature.renametrack.RenameTrackUseCase
 import com.gpxeditor.shared.feature.trackdetail.TrackDetailUseCase
 import java.io.File
+import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.cancel
 
 class MainActivity : ComponentActivity() {
     private lateinit var openGpxLauncher: ActivityResultLauncher<Array<String>>
     private lateinit var importScreenController: ImportScreenController
+    private val powerSensorScope = MainScope()
+    private lateinit var powerSensorController: PowerSensorController
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -42,6 +50,11 @@ class MainActivity : ComponentActivity() {
         val importedTrackStore = JsonImportedTrackStore(applicationContext)
         val importIdGenerator = AndroidImportIdGenerator()
         val importClock = AndroidImportClock()
+        powerSensorController = PowerSensorController(
+            scope = powerSensorScope,
+            sensor = KablePowerSensor(powerSensorScope),
+            settings = PowerSensorSettingsStore(FilePowerSensorSettingsStorage(applicationContext)),
+        )
         importScreenController = ImportScreenController(
             importGpxTrackUseCase = ImportGpxTrackUseCase(
                 fileStorage = fileStorage,
@@ -121,6 +134,7 @@ class MainActivity : ComponentActivity() {
                 onRecordingClosed = importScreenController::loadImportedTracks,
                 onRestoreRecording = importScreenController::restoreRecoveredRecording,
                 onDiscardRecording = importScreenController::discardRecoveredRecording,
+                powerSensorController = powerSensorController,
             )
         }
 
@@ -133,6 +147,11 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         handleViewIntent(intent)
+    }
+
+    override fun onDestroy() {
+        powerSensorScope.cancel()
+        super.onDestroy()
     }
 
     private fun handleViewIntent(intent: Intent?) {

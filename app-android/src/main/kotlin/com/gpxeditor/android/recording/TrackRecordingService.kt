@@ -29,6 +29,8 @@ import com.gpxeditor.shared.feature.recordtrack.SaveRecordedTrackRequest
 import com.gpxeditor.shared.feature.recordtrack.SaveRecordedTrackResult
 import com.gpxeditor.shared.feature.recordtrack.SaveRecordedTrackUseCase
 import com.gpxeditor.shared.feature.recordtrack.TrackRecorder
+import com.gpxeditor.shared.data.ble.KablePowerSensor
+import com.gpxeditor.shared.data.ble.PowerSensorSettingsStore
 import java.util.concurrent.Executors
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -54,6 +56,8 @@ class TrackRecordingService : Service() {
     private var recorder: TrackRecorder? = null
     private var locationJob: Job? = null
     private var tickerJob: Job? = null
+    private var powerSensor: KablePowerSensor? = null
+    private var powerSensorJob: Job? = null
 
     // Single-threaded so journal lines land in order; also runs the final save.
     private val journalExecutor = Executors.newSingleThreadExecutor()
@@ -88,6 +92,8 @@ class TrackRecordingService : Service() {
     }
 
     override fun onDestroy() {
+        powerSensorJob?.cancel()
+        powerSensorJob = null
         scope.cancel()
         journalExecutor.shutdown()
         if (recorder != null) {
@@ -126,6 +132,7 @@ class TrackRecordingService : Service() {
         )
 
         startLocationUpdates()
+        startPowerSensor()
         tickerJob = scope.launch {
             while (isActive) {
                 publishStats()
@@ -163,6 +170,7 @@ class TrackRecordingService : Service() {
         val recorded = recorder.stop(atEpochMillis = now())
         _stats.value = null
         stopLocationUpdates()
+        stopPowerSensor()
         tickerJob?.cancel()
         tickerJob = null
 
@@ -212,6 +220,24 @@ class TrackRecordingService : Service() {
     private fun stopLocationUpdates() {
         locationJob?.cancel()
         locationJob = null
+    }
+
+    private fun startPowerSensor() {
+        if (powerSensorJob != null || !PowerSensorPermissions.allGranted(this)) return
+        val selected = PowerSensorSettingsStore(FilePowerSensorSettingsStorage(this)).load() ?: return
+        val sensor = KablePowerSensor(scope)
+        powerSensor = sensor
+        powerSensorJob = scope.launch {
+            sensor.connect(selected.id)
+        }
+    }
+
+    private fun stopPowerSensor() {
+        powerSensorJob?.cancel()
+        powerSensorJob = null
+        val sensor = powerSensor
+        powerSensor = null
+        if (sensor != null) scope.launch { sensor.disconnect() }
     }
 
     private fun publishStats() {

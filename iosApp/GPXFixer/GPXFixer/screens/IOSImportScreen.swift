@@ -26,6 +26,12 @@ struct IOSImportScreen: View {
                         )
                     }
 
+                    NavigationLink {
+                        IOSPowerSensorScreen()
+                    } label: {
+                        Label("Sensors", systemImage: "sensor")
+                    }
+
                     if viewModel.isImporting {
                         ProgressView("Importing")
                     }

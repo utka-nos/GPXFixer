@@ -15,6 +15,7 @@ final class RecordingSession: NSObject, ObservableObject, CLLocationManagerDeleg
     @Published private(set) var recoveredRecording: RecordedActivity?
 
     private let facade = IosRecordingFacade()
+    private let powerSensorFacade = IosPowerSensorFacade()
     private let manager = CLLocationManager()
     private let journalQueue = DispatchQueue(label: "com.gpxeditor.recording.journal")
     private var recorder: TrackRecorder?
@@ -68,6 +69,7 @@ final class RecordingSession: NSObject, ObservableObject, CLLocationManagerDeleg
         manager.allowsBackgroundLocationUpdates = true
         manager.showsBackgroundLocationIndicator = true
         manager.startUpdatingLocation()
+        powerSensorFacade.connectSaved()
         startTicker()
         publishStats()
     }
@@ -105,6 +107,7 @@ final class RecordingSession: NSObject, ObservableObject, CLLocationManagerDeleg
         stopTicker()
         manager.stopUpdatingLocation()
         manager.allowsBackgroundLocationUpdates = false
+        powerSensorFacade.disconnect()
 
         journalQueue.async {
             let message = self.saveClearingJournal(recorded.document)

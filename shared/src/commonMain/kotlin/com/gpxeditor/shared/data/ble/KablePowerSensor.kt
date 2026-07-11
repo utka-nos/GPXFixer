@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -51,12 +52,22 @@ class KablePowerSensor(
     private var observationJob: Job? = null
     private var stateJob: Job? = null
 
-    override suspend fun connect() {
+    override fun scan(): Flow<PowerSensorDevice> = scanner.advertisements.map { advertisement ->
+        PowerSensorDevice(
+            id = advertisement.identifier.toString(),
+            name = advertisement.name ?: advertisement.peripheralName,
+            rssi = advertisement.rssi,
+        )
+    }
+
+    override suspend fun connect(sensorId: String?) {
         if (peripheral != null) return
 
         mutableConnectionState.value = PowerSensorConnectionState.Scanning
         try {
-            val advertisement = scanner.advertisements.first()
+            val advertisement = scanner.advertisements.first { advertisement ->
+                sensorId == null || advertisement.identifier.toString() == sensorId
+            }
             val sensorName = advertisement.name ?: advertisement.peripheralName
             mutableConnectionState.value = PowerSensorConnectionState.Connecting(sensorName)
 
