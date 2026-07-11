@@ -5,6 +5,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.gpxeditor.android.data.imported.JsonImportedTrackStore
+import com.gpxeditor.android.recording.FileRecordingJournal
 import com.gpxeditor.shared.data.activity.ActivityDocumentJson
 import com.gpxeditor.shared.data.activity.ActivityGpxMapper
 import com.gpxeditor.shared.data.gpx.GpxSerializer
@@ -25,6 +26,10 @@ import com.gpxeditor.shared.feature.importfit.ImportFitTrackUseCase
 import com.gpxeditor.shared.feature.importgpx.ImportGpxTrackRequest
 import com.gpxeditor.shared.feature.importgpx.ImportGpxTrackResult
 import com.gpxeditor.shared.feature.importgpx.ImportGpxTrackUseCase
+import com.gpxeditor.shared.feature.recordtrack.RecordingJournal
+import com.gpxeditor.shared.feature.recordtrack.SaveRecordedTrackRequest
+import com.gpxeditor.shared.feature.recordtrack.SaveRecordedTrackResult
+import com.gpxeditor.shared.feature.recordtrack.SaveRecordedTrackUseCase
 import com.gpxeditor.shared.feature.renametrack.RenameTrackRequest
 import com.gpxeditor.shared.feature.renametrack.RenameTrackResult
 import com.gpxeditor.shared.feature.renametrack.RenameTrackUseCase
@@ -46,6 +51,9 @@ class ImportScreenController(
     private val deleteImportedTrackUseCase: DeleteImportedTrackUseCase,
     private val deleteGpxTrackPointUseCase: DeleteGpxTrackPointUseCase,
     private val moveGpxTrackPointUseCase: MoveGpxTrackPointUseCase,
+    private val saveRecordedTrackUseCase: SaveRecordedTrackUseCase,
+    private val recordingJournal: FileRecordingJournal,
+    private val isRecordingActive: () -> Boolean,
     private val fileStorage: GpxTrackFileStorage,
     private val importedTrackStore: JsonImportedTrackStore,
     private val readTextFrom: (Uri) -> String,
@@ -414,6 +422,87 @@ class ImportScreenController(
                         statusMessage = null,
                         errorMessage = throwable.message ?: "Failed to delete track",
                     )
+                }
+            }
+        }.start()
+    }
+
+    fun checkRecordingRecovery() {
+        Thread {
+            runCatching {
+                if (!recordingJournal.exists() || isRecordingActive()) {
+                    null
+                } else {
+                    val recovered = RecordingJournal.recover(recordingJournal.read())
+                    if (recovered == null || recovered.document.pointCount == 0) {
+                        recordingJournal.clear()
+                        null
+                    } else {
+                        recovered
+                    }
+                }
+            }.onSuccess { recovered ->
+                if (recovered != null) {
+                    runOnUiThread {
+                        state = state.copy(recoveredRecording = recovered)
+                    }
+                }
+            }
+        }.start()
+    }
+
+    fun restoreRecoveredRecording() {
+        val recovered = state.recoveredRecording ?: return
+        state = state.copy(
+            recoveredRecording = null,
+            statusMessage = null,
+            errorMessage = null,
+        )
+
+        Thread {
+            runCatching {
+                val result = runSuspendBlocking {
+                    saveRecordedTrackUseCase(SaveRecordedTrackRequest(recovered.document))
+                }
+                if (!isRecordingActive()) {
+                    recordingJournal.clear()
+                }
+                val history = runSuspendBlocking { importedTrackStore.getAll() }
+                result to history
+            }.onSuccess { (result, history) ->
+                runOnUiThread {
+                    state = when (result) {
+                        is SaveRecordedTrackResult.Success -> state.copy(
+                            tracks = history,
+                            statusMessage = "Restored ${result.importedTrack.displayName}",
+                            errorMessage = null,
+                        )
+
+                        is SaveRecordedTrackResult.Failure -> state.copy(
+                            tracks = history,
+                            statusMessage = null,
+                            errorMessage = result.message,
+                        )
+                    }
+                }
+            }.onFailure { throwable ->
+                runOnUiThread {
+                    state = state.copy(
+                        statusMessage = null,
+                        errorMessage = throwable.message ?: "Failed to restore recording",
+                    )
+                }
+            }
+        }.start()
+    }
+
+    fun discardRecoveredRecording() {
+        state = state.copy(recoveredRecording = null)
+
+        Thread {
+            runCatching {
+                if (!isRecordingActive()) {
+                    recordingJournal.clear()
                 }
             }
         }.start()
