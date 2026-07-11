@@ -13,6 +13,7 @@ final class RecordingSession: NSObject, ObservableObject, CLLocationManagerDeleg
     @Published private(set) var lastSaveMessage: String?
     @Published private(set) var authorizationDenied = false
     @Published private(set) var recoveredRecording: RecordedActivity?
+    @Published private(set) var powerSensorStatus = PowerSensorRecordingStatus.notConfigured
 
     private let facade = IosRecordingFacade()
     private let powerSensorFacade = IosPowerSensorFacade()
@@ -73,11 +74,13 @@ final class RecordingSession: NSObject, ObservableObject, CLLocationManagerDeleg
         manager.allowsBackgroundLocationUpdates = true
         manager.showsBackgroundLocationIndicator = true
         manager.startUpdatingLocation()
-        powerSensorFacade.connectSaved { [weak self] sample in
+        powerSensorFacade.connectSaved(onSample: { [weak self] sample in
             guard let self, let recorder = self.recorder else { return }
             recorder.onPower(sample: sample, atEpochMillis: self.nowMillis())
             self.publishStats()
-        }
+        }, onStatus: { [weak self] status in
+            self?.powerSensorStatus = status
+        })
         startTicker()
         publishStats()
     }
@@ -116,6 +119,7 @@ final class RecordingSession: NSObject, ObservableObject, CLLocationManagerDeleg
         manager.stopUpdatingLocation()
         manager.allowsBackgroundLocationUpdates = false
         powerSensorFacade.disconnect()
+        powerSensorStatus = .notConnected
 
         journalQueue.async {
             let message = self.saveClearingJournal(recorded.document)

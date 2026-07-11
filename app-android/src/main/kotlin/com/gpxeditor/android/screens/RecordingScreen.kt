@@ -29,11 +29,13 @@ import com.gpxeditor.android.recording.RecordingPermissions
 import com.gpxeditor.android.recording.TrackRecordingService
 import com.gpxeditor.shared.feature.recordtrack.RecordingState
 import com.gpxeditor.shared.feature.recordtrack.RecordingStats
+import com.gpxeditor.shared.data.ble.PowerSensorRecordingStatus
 
 @Composable
 fun RecordingScreen(onBackClick: () -> Unit) {
     val context = LocalContext.current
     val stats by TrackRecordingService.stats.collectAsState()
+    val powerSensorStatus by TrackRecordingService.powerSensorStatus.collectAsState()
     var permissionsGranted by remember { mutableStateOf(RecordingPermissions.allGranted(context)) }
     var showStopConfirmation by remember { mutableStateOf(false) }
 
@@ -88,6 +90,7 @@ fun RecordingScreen(onBackClick: () -> Unit) {
         } else {
             ActiveRecordingContent(
                 stats = currentStats,
+                powerSensorStatus = powerSensorStatus,
                 onPauseClick = { TrackRecordingService.pause(context) },
                 onResumeClick = { TrackRecordingService.resume(context) },
                 onStopClick = { showStopConfirmation = true },
@@ -140,6 +143,7 @@ private fun IdleContent(
 @Composable
 private fun ActiveRecordingContent(
     stats: RecordingStats,
+    powerSensorStatus: PowerSensorRecordingStatus,
     onPauseClick: () -> Unit,
     onResumeClick: () -> Unit,
     onStopClick: () -> Unit,
@@ -154,6 +158,20 @@ private fun ActiveRecordingContent(
     StatRow(label = "Points", value = stats.pointCount.toString())
     StatRow(label = "Power", value = stats.currentPowerWatts?.let { "$it W" } ?: "—")
     StatRow(label = "Cadence", value = stats.currentCadenceRpm?.let { "$it rpm" } ?: "—")
+    Text(
+        text = when (powerSensorStatus) {
+            PowerSensorRecordingStatus.CONNECTED -> "Power sensor connected"
+            PowerSensorRecordingStatus.RECONNECTING -> "Power sensor reconnecting…"
+            PowerSensorRecordingStatus.NOT_CONNECTED -> "Power sensor not connected"
+            PowerSensorRecordingStatus.NOT_CONFIGURED -> "No power sensor configured"
+        },
+        color = if (powerSensorStatus == PowerSensorRecordingStatus.CONNECTED) {
+            MaterialTheme.colorScheme.primary
+        } else {
+            MaterialTheme.colorScheme.secondary
+        },
+        style = MaterialTheme.typography.bodyMedium,
+    )
 
     when {
         stats.state == RecordingState.PAUSED -> {

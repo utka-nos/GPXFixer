@@ -66,6 +66,10 @@ struct IOSRecordingScreen: View {
                 statRow("Points", "\(stats.pointCount)")
                 statRow("Power", stats.currentPowerWatts.map { "\($0.intValue) W" } ?? "—")
                 statRow("Cadence", stats.currentCadenceRpm.map { "\($0.intValue) rpm" } ?? "—")
+                Text(powerSensorStatusText)
+                    .foregroundStyle(
+                        session.powerSensorStatus == .connected ? Color.green : Color.secondary
+                    )
 
                 if stats.state == RecordingState.paused {
                     Text("Paused")
@@ -97,6 +101,21 @@ struct IOSRecordingScreen: View {
                     Label("Stop", systemImage: "stop.fill")
                 }
             }
+        }
+    }
+
+    private var powerSensorStatusText: String {
+        switch session.powerSensorStatus {
+        case .connected:
+            return "Power sensor connected"
+        case .reconnecting:
+            return "Power sensor reconnecting…"
+        case .notConnected:
+            return "Power sensor not connected"
+        case .notConfigured:
+            return "No power sensor configured"
+        default:
+            return "Power sensor not connected"
         }
     }
 

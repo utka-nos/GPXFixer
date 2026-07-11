@@ -56,6 +56,7 @@ class IosPowerSensorFacade {
     private val settings = PowerSensorSettingsStore(IosPowerSensorSettingsStorage())
     private var scanJob: Job? = null
     private var sampleJob: Job? = null
+    private var connectionJob: Job? = null
 
     fun selectedSensor(): SelectedPowerSensor? = settings.load()
 
@@ -97,14 +98,26 @@ class IosPowerSensorFacade {
         scope.launch { sensor.disconnect() }
     }
 
-    fun connectSaved(onSample: (PowerSample) -> Unit) {
-        val selected = settings.load() ?: return
+    fun connectSaved(
+        onSample: (PowerSample) -> Unit,
+        onStatus: (PowerSensorRecordingStatus) -> Unit,
+    ) {
+        val selected = settings.load()
+        if (selected == null) {
+            onStatus(PowerSensorRecordingStatus.NOT_CONFIGURED)
+            return
+        }
         sampleJob?.cancel()
         sampleJob = scope.launch { sensor.samples.collect(onSample) }
-        scope.launch { sensor.connect(selected.id) }
+        connectionJob?.cancel()
+        connectionJob = scope.launch {
+            PowerSensorReconnectManager(sensor).run(selected.id, onStatus)
+        }
     }
 
     fun disconnect() {
+        connectionJob?.cancel()
+        connectionJob = null
         sampleJob?.cancel()
         sampleJob = null
         scope.launch { sensor.disconnect() }
