@@ -19,6 +19,12 @@ fun formatDuration(millis: Long): String {
     return String.format(Locale.US, "%02d:%02d:%02d", hours, minutes, seconds)
 }
 
+fun formatSpeed(metersPerSecond: Double?): String {
+    return metersPerSecond?.let {
+        String.format(Locale.US, "%.1f km/h", it * 3.6)
+    } ?: "—"
+}
+
 fun formatElevation(meters: Double?): String {
     return meters?.let { String.format(Locale.US, "%.0f m", it) } ?: "No data"
 }

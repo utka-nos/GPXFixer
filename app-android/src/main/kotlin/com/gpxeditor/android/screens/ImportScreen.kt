@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import com.gpxeditor.android.EmptyHistory
 import com.gpxeditor.android.ImportScreenState
 import com.gpxeditor.android.ImportedTrackRow
+import com.gpxeditor.android.RecordingScreen
 import com.gpxeditor.android.TrackDetailScreen
 import com.gpxeditor.android.TrackTrimScreen
 import com.gpxeditor.shared.domain.activity.ActivityDocument
@@ -54,9 +55,15 @@ fun ImportScreen(
     onSaveEditedTrack: (ActivityDocument) -> Unit,
 ) {
     var trackPendingDelete by remember { mutableStateOf<ImportedTrack?>(null) }
+    var isRecordingOpen by remember { mutableStateOf(false) }
 
     MaterialTheme {
         Surface(modifier = Modifier.fillMaxSize()) {
+            if (isRecordingOpen) {
+                RecordingScreen(onBackClick = { isRecordingOpen = false })
+                return@Surface
+            }
+
             state.editTrackDetail?.let { detail ->
                 TrackEditScreen(
                     detail = detail,
@@ -123,6 +130,9 @@ fun ImportScreen(
                         onClick = onImportClick,
                     ) {
                         Text(if (state.isImporting) "Importing" else "Import GPX")
+                    }
+                    Button(onClick = { isRecordingOpen = true }) {
+                        Text("Record")
                     }
                     if (state.isImporting) {
                         CircularProgressIndicator()
