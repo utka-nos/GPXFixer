@@ -16,6 +16,11 @@ final class RecordingSession: NSObject, ObservableObject, CLLocationManagerDeleg
     /// empty when nothing is being recorded or there is no GPS fix yet.
     @Published private(set) var routeSegments: [[CLLocationCoordinate2D]] = []
 
+    /// Live power-over-active-time series of the active recording, one point
+    /// per elapsed second; empty when nothing is being recorded or no power
+    /// sample has arrived yet.
+    @Published private(set) var powerChartSamples: [TrackChartSample] = []
+
     @Published private(set) var lastSaveMessage: String?
     @Published private(set) var authorizationDenied = false
     @Published private(set) var recoveredRecording: RecordedActivity?
@@ -30,6 +35,7 @@ final class RecordingSession: NSObject, ObservableObject, CLLocationManagerDeleg
     private var recorder: TrackRecorder?
     private var ticker: Timer?
     private var pendingStart = false
+    private let livePowerSeries = LiveMetricSeries()
 
     private override init() {
         super.init()
@@ -63,6 +69,8 @@ final class RecordingSession: NSObject, ObservableObject, CLLocationManagerDeleg
         authorizationDenied = false
         lastSaveMessage = nil
         routeSegments = []
+        livePowerSeries.clear()
+        powerChartSamples = []
 
         let startedAt = nowMillis()
         let startedRecorder = TrackRecorder(
@@ -86,7 +94,15 @@ final class RecordingSession: NSObject, ObservableObject, CLLocationManagerDeleg
         manager.startUpdatingLocation()
         powerSensorFacade.connectSaved(onSample: { [weak self] sample in
             guard let self, let recorder = self.recorder else { return }
-            recorder.onPower(sample: sample, atEpochMillis: self.nowMillis())
+            let sampledAt = self.nowMillis()
+            recorder.onPower(sample: sample, atEpochMillis: sampledAt)
+            if recorder.state == RecordingState.recording {
+                self.livePowerSeries.add(
+                    elapsedSeconds: recorder.stats(nowEpochMillis: sampledAt).elapsedMillis / 1_000,
+                    value: sample.watts
+                )
+                self.powerChartSamples = self.livePowerSeries.snapshot()
+            }
             self.publishStats()
         }, onStatus: { [weak self] status in
             self?.powerSensorStatus = status
@@ -133,6 +149,8 @@ final class RecordingSession: NSObject, ObservableObject, CLLocationManagerDeleg
         let recorded = recorder.stop(atEpochMillis: nowMillis(), name: nil)
         stats = nil
         routeSegments = []
+        livePowerSeries.clear()
+        powerChartSamples = []
         stopTicker()
         manager.stopUpdatingLocation()
         manager.allowsBackgroundLocationUpdates = false

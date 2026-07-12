@@ -92,6 +92,13 @@ struct IOSRecordingScreen: View {
                 }
             }
 
+            if LiveChartWindow.shared.liveWindow(samples: session.powerChartSamples) != nil {
+                Section {
+                    LivePowerChartView(samples: session.powerChartSamples)
+                        .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
+                }
+            }
+
             Section {
                 if stats.state == RecordingState.paused {
                     Button {

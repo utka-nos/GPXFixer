@@ -21,6 +21,7 @@ import com.gpxeditor.android.data.imported.JsonImportedTrackStore
 import com.gpxeditor.android.data.location.AndroidLocationSource
 import com.gpxeditor.android.screens.formatDistance
 import com.gpxeditor.android.screens.formatDuration
+import com.gpxeditor.shared.feature.recordtrack.LiveMetricSeries
 import com.gpxeditor.shared.feature.recordtrack.LocationSource
 import com.gpxeditor.shared.feature.recordtrack.RecordedActivity
 import com.gpxeditor.shared.feature.recordtrack.RecordingJournal
@@ -31,6 +32,7 @@ import com.gpxeditor.shared.feature.recordtrack.SaveRecordedTrackRequest
 import com.gpxeditor.shared.feature.recordtrack.SaveRecordedTrackResult
 import com.gpxeditor.shared.feature.recordtrack.SaveRecordedTrackUseCase
 import com.gpxeditor.shared.feature.recordtrack.TrackRecorder
+import com.gpxeditor.shared.feature.trackdetail.TrackChartSample
 import com.gpxeditor.shared.data.ble.HeartRateSensorReconnectManager
 import com.gpxeditor.shared.data.ble.HeartRateSensorRecordingStatus
 import com.gpxeditor.shared.data.ble.HeartRateSensorSettingsStore
@@ -70,6 +72,7 @@ class TrackRecordingService : Service() {
     private var heartRateSensor: KableHeartRateSensor? = null
     private var heartRateSensorJob: Job? = null
     private var heartRateSampleJob: Job? = null
+    private val livePowerSeries = LiveMetricSeries()
 
     // Single-threaded so journal lines land in order; also runs the final save.
     private val journalExecutor = Executors.newSingleThreadExecutor()
@@ -119,6 +122,7 @@ class TrackRecordingService : Service() {
             recorder = null
             _stats.value = null
             _routeSegments.value = emptyList()
+            _powerChartSamples.value = emptyList()
         }
         super.onDestroy()
     }
@@ -140,6 +144,8 @@ class TrackRecordingService : Service() {
 
         _lastSaveMessage.value = null
         _routeSegments.value = emptyList()
+        livePowerSeries.clear()
+        _powerChartSamples.value = emptyList()
         val startedAt = now()
         val startedRecorder = TrackRecorder()
         recorder = startedRecorder
@@ -201,6 +207,8 @@ class TrackRecordingService : Service() {
         val recorded = recorder.stop(atEpochMillis = now())
         _stats.value = null
         _routeSegments.value = emptyList()
+        livePowerSeries.clear()
+        _powerChartSamples.value = emptyList()
         stopLocationUpdates()
         stopPowerSensor()
         stopHeartRateSensor()
@@ -273,7 +281,17 @@ class TrackRecordingService : Service() {
         powerSensor = sensor
         powerSampleJob = scope.launch {
             sensor.samples.collect { sample ->
-                recorder?.onPower(sample, now())
+                val sampledAt = now()
+                recorder?.onPower(sample, sampledAt)
+                recorder?.let { activeRecorder ->
+                    if (activeRecorder.state == RecordingState.RECORDING) {
+                        livePowerSeries.add(
+                            elapsedSeconds = activeRecorder.stats(sampledAt).elapsedMillis / 1_000,
+                            value = sample.watts,
+                        )
+                        _powerChartSamples.value = livePowerSeries.snapshot()
+                    }
+                }
                 publishStats()
             }
         }
@@ -401,6 +419,15 @@ class TrackRecordingService : Service() {
 
         /** Outcome of saving the most recently stopped recording; cleared when a new one starts. */
         val lastSaveMessage: StateFlow<String?> = _lastSaveMessage
+
+        private val _powerChartSamples = MutableStateFlow<List<TrackChartSample>>(emptyList())
+
+        /**
+         * Live power-over-active-time series of the active recording, one point
+         * per elapsed second; empty when nothing is being recorded or no power
+         * sample has arrived yet.
+         */
+        val powerChartSamples: StateFlow<List<TrackChartSample>> = _powerChartSamples
 
         private val _powerSensorStatus =
             MutableStateFlow(PowerSensorRecordingStatus.NOT_CONFIGURED)
