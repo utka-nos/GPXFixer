@@ -78,6 +78,7 @@ class PowerChartCalculatorTest {
 
         assertEquals(listOf(0L, 10L, 20L), samples.map { it.elapsedSeconds })
         assertEquals(listOf(100, 110, 120), samples.map { it.powerWatts })
+        assertEquals(listOf(0, 1, 2), samples.map { it.segmentIndex })
     }
 
     @Test

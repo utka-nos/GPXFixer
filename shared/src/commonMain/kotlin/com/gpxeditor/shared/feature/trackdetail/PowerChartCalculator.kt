@@ -7,6 +7,8 @@ import com.gpxeditor.shared.domain.activity.ActivityDocument
 data class PowerChartSample(
     val elapsedSeconds: Long,
     val powerWatts: Int,
+    /** Identifies the source GPX segment so charts never connect segment boundaries. */
+    val segmentIndex: Int = 0,
 )
 
 object PowerChartCalculator {
@@ -19,21 +21,30 @@ object PowerChartCalculator {
     fun samplesFor(document: ActivityDocument): List<PowerChartSample> {
         val timedPowers = document.tracks
             .flatMap { it.segments }
-            .flatMap { it.points }
-            .mapNotNull { point ->
-                val power = point.powerWatts ?: return@mapNotNull null
-                val unixSeconds = point.time?.let(::isoToUnixSeconds) ?: return@mapNotNull null
-                unixSeconds to power
+            .mapIndexed { segmentIndex, segment ->
+                segment.points.mapNotNull { point ->
+                    val power = point.powerWatts ?: return@mapNotNull null
+                    val unixSeconds = point.time?.let(::isoToUnixSeconds) ?: return@mapNotNull null
+                    TimedPower(unixSeconds, power, segmentIndex)
+                }
             }
-            .sortedBy { it.first }
+            .flatten()
+            .sortedBy { it.unixSeconds }
         if (timedPowers.size < 2) return emptyList()
 
-        val startSeconds = timedPowers.first().first
-        return timedPowers.map { (unixSeconds, power) ->
+        val startSeconds = timedPowers.first().unixSeconds
+        return timedPowers.map { timedPower ->
             PowerChartSample(
-                elapsedSeconds = unixSeconds - startSeconds,
-                powerWatts = power,
+                elapsedSeconds = timedPower.unixSeconds - startSeconds,
+                powerWatts = timedPower.powerWatts,
+                segmentIndex = timedPower.segmentIndex,
             )
         }
     }
+
+    private data class TimedPower(
+        val unixSeconds: Long,
+        val powerWatts: Int,
+        val segmentIndex: Int,
+    )
 }
