@@ -28,6 +28,7 @@ class TrackDetailUseCase(
                 warnings = TrackSummaryCalculator.warningsFor(document),
                 powerSamples = TrackChartCalculator.powerSamplesFor(document),
                 heartRateSamples = TrackChartCalculator.heartRateSamplesFor(document),
+                speedSamples = TrackChartCalculator.speedSamplesFor(document),
             ),
         )
     }
@@ -67,6 +68,7 @@ data class TrackDetail(
     val warnings: List<String>,
     val powerSamples: List<TrackChartSample> = emptyList(),
     val heartRateSamples: List<TrackChartSample> = emptyList(),
+    val speedSamples: List<TrackChartSample> = emptyList(),
 )
 
 data class TrackSummary(

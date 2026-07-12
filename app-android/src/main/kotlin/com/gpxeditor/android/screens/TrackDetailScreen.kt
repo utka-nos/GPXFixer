@@ -42,6 +42,7 @@ fun TrackDetailScreen(
     var isMapFullScreen by remember { mutableStateOf(false) }
     var isPowerChartFullScreen by remember { mutableStateOf(false) }
     var isHeartRateChartFullScreen by remember { mutableStateOf(false) }
+    var isSpeedChartFullScreen by remember { mutableStateOf(false) }
     var isRenameDialogVisible by remember { mutableStateOf(false) }
 
     if (isMapFullScreen) {
@@ -70,6 +71,17 @@ fun TrackDetailScreen(
             unitLong = "beats per minute",
             samples = detail.heartRateSamples,
             onBackClick = { isHeartRateChartFullScreen = false },
+        )
+        return
+    }
+
+    if (isSpeedChartFullScreen) {
+        TrackChartFullScreen(
+            title = "Speed",
+            unit = "km/h",
+            unitLong = "kilometers per hour",
+            samples = detail.speedSamples,
+            onBackClick = { isSpeedChartFullScreen = false },
         )
         return
     }
@@ -134,6 +146,12 @@ fun TrackDetailScreen(
             unit = "bpm",
             samples = detail.heartRateSamples,
             onOpenChart = { isHeartRateChartFullScreen = true },
+        )
+        TrackChartSection(
+            title = "Speed",
+            unit = "km/h",
+            samples = detail.speedSamples,
+            onOpenChart = { isSpeedChartFullScreen = true },
         )
         WarningsSection(warnings = detail.warnings)
         TrackSegmentsSection(segments = detail.segments)
