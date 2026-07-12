@@ -17,6 +17,13 @@ struct TrackChartMetric {
         unitLong: "watts",
         emptyIcon: "bolt"
     )
+
+    static let heartRate = TrackChartMetric(
+        title: "Heart rate",
+        unit: "bpm",
+        unitLong: "beats per minute",
+        emptyIcon: "heart"
+    )
 }
 
 /// Full-screen metric-over-time chart. One finger scrubs a selection crosshair;
