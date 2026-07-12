@@ -81,6 +81,26 @@ class PowerChartCalculatorTest {
     }
 
     @Test
+    fun sortsSamplesByTimestamp() {
+        val document = documentWithPoints(
+            ActivityPoint(time = "2026-05-31T08:01:00Z", powerWatts = 180),
+            ActivityPoint(time = "2026-05-31T08:00:00Z", powerWatts = 200),
+            ActivityPoint(time = "2026-05-31T08:00:05Z", powerWatts = 250),
+        )
+
+        val samples = PowerChartCalculator.samplesFor(document)
+
+        assertEquals(
+            listOf(
+                PowerChartSample(elapsedSeconds = 0, powerWatts = 200),
+                PowerChartSample(elapsedSeconds = 5, powerWatts = 250),
+                PowerChartSample(elapsedSeconds = 60, powerWatts = 180),
+            ),
+            samples,
+        )
+    }
+
+    @Test
     fun returnsEmptyListForSingleUsableSample() {
         val document = documentWithPoints(
             ActivityPoint(time = "2026-05-31T08:00:00Z", powerWatts = 200),
