@@ -55,6 +55,7 @@ class IosHeartRateSensorFacade {
     private val sensor = KableHeartRateSensor(scope)
     private val settings = HeartRateSensorSettingsStore(IosHeartRateSensorSettingsStorage())
     private var scanJob: Job? = null
+    private var selectionJob: Job? = null
     private var sampleJob: Job? = null
     private var connectionJob: Job? = null
 
@@ -79,23 +80,40 @@ class IosHeartRateSensorFacade {
 
     fun closeScreen() {
         stopScan()
-        scope.launch { sensor.disconnect() }
+        val activeSelection = selectionJob
+        selectionJob = null
+        activeSelection?.cancel()
+        scope.launch {
+            activeSelection?.join()
+            sensor.disconnect()
+        }
     }
 
     fun select(device: HeartRateSensorDevice, onComplete: (Boolean) -> Unit) {
+        if (selectionJob != null) return
         stopScan()
-        scope.launch {
-            sensor.disconnect()
-            sensor.connect(device.id)
-            val connected = sensor.connectionState.value is HeartRateSensorConnectionState.Connected
-            if (connected) settings.save(SelectedHeartRateSensor(device.id, device.name))
-            onComplete(connected)
+        selectionJob = scope.launch {
+            try {
+                sensor.disconnect()
+                sensor.connect(device.id)
+                val connected = sensor.connectionState.value is HeartRateSensorConnectionState.Connected
+                if (connected) settings.save(SelectedHeartRateSensor(device.id, device.name))
+                onComplete(connected)
+            } finally {
+                selectionJob = null
+            }
         }
     }
 
     fun forget() {
+        val activeSelection = selectionJob
+        selectionJob = null
+        activeSelection?.cancel()
         settings.save(null)
-        scope.launch { sensor.disconnect() }
+        scope.launch {
+            activeSelection?.join()
+            sensor.disconnect()
+        }
     }
 
     fun connectSaved(
