@@ -38,23 +38,26 @@ import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import com.gpxeditor.shared.feature.trackdetail.PowerChartPresenter
-import com.gpxeditor.shared.feature.trackdetail.PowerChartSample
-import com.gpxeditor.shared.feature.trackdetail.PowerChartWindow
+import com.gpxeditor.shared.feature.trackdetail.TrackChartPresenter
+import com.gpxeditor.shared.feature.trackdetail.TrackChartSample
+import com.gpxeditor.shared.feature.trackdetail.TrackChartWindow
 import kotlin.math.roundToLong
 
 /**
- * Full-screen power-over-time chart. One finger scrubs a selection crosshair;
+ * Full-screen metric-over-time chart. One finger scrubs a selection crosshair;
  * two fingers pinch to zoom and pan the visible time window.
  */
 @Composable
-fun PowerChartFullScreen(
-    samples: List<PowerChartSample>,
+fun TrackChartFullScreen(
+    title: String,
+    unit: String,
+    unitLong: String,
+    samples: List<TrackChartSample>,
     onBackClick: () -> Unit,
 ) {
-    val fullWindow = remember(samples) { PowerChartPresenter.fullWindow(samples) }
+    val fullWindow = remember(samples) { TrackChartPresenter.fullWindow(samples) }
     var window by remember(samples) { mutableStateOf(fullWindow) }
-    var selectedSample by remember(samples) { mutableStateOf<PowerChartSample?>(null) }
+    var selectedSample by remember(samples) { mutableStateOf<TrackChartSample?>(null) }
     var chartSize by remember { mutableStateOf(IntSize.Zero) }
 
     Column(
@@ -84,14 +87,14 @@ fun PowerChartFullScreen(
         val currentWindow = window
         if (fullWindow == null || currentWindow == null) {
             Text(
-                text = "Not enough power data to draw a chart.",
+                text = "Not enough ${title.lowercase()} data to draw a chart.",
                 style = MaterialTheme.typography.bodyMedium,
             )
             return@Column
         }
 
         val presentation = remember(samples, currentWindow, chartSize.width) {
-            PowerChartPresenter.presentation(
+            TrackChartPresenter.presentation(
                 samples = samples,
                 window = currentWindow,
                 maxRenderPoints = (chartSize.width / 2).coerceAtLeast(300),
@@ -99,37 +102,39 @@ fun PowerChartFullScreen(
         }
 
         Text(
-            text = "Power, W",
+            text = "$title, $unit",
             style = MaterialTheme.typography.titleMedium,
         )
         Text(
             text = listOfNotNull(
-                presentation.averagePowerWatts?.let { "Avg $it W" },
-                presentation.maxPowerWatts?.let { "Max $it W" },
+                presentation.averageValue?.let { "Avg $it $unit" },
+                presentation.maxValue?.let { "Max $it $unit" },
             ).joinToString(" · ") + " (visible range)",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
         val chartDescription = buildString {
-            append("Power chart from ")
-            append(PowerChartPresenter.formatElapsed(currentWindow.startSeconds))
+            append("$title chart from ")
+            append(TrackChartPresenter.formatElapsed(currentWindow.startSeconds))
             append(" to ")
-            append(PowerChartPresenter.formatElapsed(currentWindow.endSeconds))
-            presentation.averagePowerWatts?.let { append(", average $it watts") }
-            presentation.maxPowerWatts?.let { append(", maximum $it watts") }
+            append(TrackChartPresenter.formatElapsed(currentWindow.endSeconds))
+            presentation.averageValue?.let { append(", average $it $unitLong") }
+            presentation.maxValue?.let { append(", maximum $it $unitLong") }
             selectedSample?.let {
                 append(". Selected point at ")
-                append(PowerChartPresenter.formatElapsed(it.elapsedSeconds))
+                append(TrackChartPresenter.formatElapsed(it.elapsedSeconds))
                 append(", ")
-                append(it.powerWatts)
-                append(" watts")
+                append(it.value)
+                append(" ")
+                append(unitLong)
             }
         }
 
-        PowerChartCanvas(
+        TrackChartCanvas(
             presentation = presentation,
             selectedSample = selectedSample,
+            unit = unit,
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
@@ -169,9 +174,9 @@ fun PowerChartFullScreen(
                                     val panSeconds =
                                         (-(centroidX - lastCentroidX) * secondsPerPx).roundToLong()
                                     val focusSeconds = geometry.xToSeconds(activeWindow, centroidX)
-                                    window = PowerChartPresenter.panned(
+                                    window = TrackChartPresenter.panned(
                                         samples = samples,
-                                        window = PowerChartPresenter.zoomed(
+                                        window = TrackChartPresenter.zoomed(
                                             samples = samples,
                                             window = activeWindow,
                                             factor = (distance / lastDistance).toDouble(),
@@ -208,10 +213,10 @@ fun PowerChartFullScreen(
  */
 @Composable
 private fun ChartPanSlider(
-    samples: List<PowerChartSample>,
-    fullWindow: PowerChartWindow,
-    window: PowerChartWindow,
-    onWindowChange: (PowerChartWindow) -> Unit,
+    samples: List<TrackChartSample>,
+    fullWindow: TrackChartWindow,
+    window: TrackChartWindow,
+    onWindowChange: (TrackChartWindow) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val currentWindow by rememberUpdatedState(window)
@@ -240,7 +245,7 @@ private fun ChartPanSlider(
                         val deltaSeconds =
                             (draggedPx / trackWidth * fullWindow.durationSeconds).roundToLong()
                         currentOnWindowChange(
-                            PowerChartPresenter.panned(samples, windowAtDragStart, deltaSeconds),
+                            TrackChartPresenter.panned(samples, windowAtDragStart, deltaSeconds),
                         )
                     },
                 )
@@ -267,9 +272,10 @@ private fun ChartPanSlider(
 }
 
 @Composable
-private fun PowerChartCanvas(
-    presentation: com.gpxeditor.shared.feature.trackdetail.PowerChartPresentation,
-    selectedSample: PowerChartSample?,
+private fun TrackChartCanvas(
+    presentation: com.gpxeditor.shared.feature.trackdetail.TrackChartPresentation,
+    selectedSample: TrackChartSample?,
+    unit: String,
     modifier: Modifier = Modifier,
 ) {
     val textMeasurer = rememberTextMeasurer()
@@ -286,14 +292,14 @@ private fun PowerChartCanvas(
             val geometry = chartGeometry(IntSize(size.width.toInt(), size.height.toInt()))
             val window = presentation.window
             if (geometry.plotWidth <= 0f || geometry.plotHeight <= 0f) return@Canvas
-            val axisMax = presentation.axisMaxWatts.coerceAtLeast(1)
+            val axisMax = presentation.axisMaxValue.coerceAtLeast(1)
 
             fun xOf(elapsedSeconds: Long): Float = geometry.secondsToX(window, elapsedSeconds)
-            fun yOf(watts: Int): Float =
-                geometry.plotBottom - geometry.plotHeight * watts / axisMax
+            fun yOf(value: Int): Float =
+                geometry.plotBottom - geometry.plotHeight * value / axisMax
 
-            presentation.powerTicks.forEach { tick ->
-                val y = yOf(tick.powerWatts)
+            presentation.valueTicks.forEach { tick ->
+                val y = yOf(tick.value)
                 drawLine(
                     color = gridColor,
                     start = Offset(geometry.plotLeft, y),
@@ -350,7 +356,7 @@ private fun PowerChartCanvas(
                 val areaPath = Path()
                 segment.forEachIndexed { index, sample ->
                     val x = xOf(sample.elapsedSeconds)
-                    val y = yOf(sample.powerWatts)
+                    val y = yOf(sample.value)
                     if (index == 0) {
                         linePath.moveTo(x, y)
                         areaPath.moveTo(x, geometry.plotBottom)
@@ -371,7 +377,7 @@ private fun PowerChartCanvas(
             }
             if (selected != null) {
                 val x = xOf(selected.elapsedSeconds)
-                val y = yOf(selected.powerWatts)
+                val y = yOf(selected.value)
                 drawLine(
                     color = lineColor,
                     start = Offset(x, geometry.plotTop),
@@ -381,8 +387,8 @@ private fun PowerChartCanvas(
                 drawCircle(color = lineColor, radius = 5.dp.toPx(), center = Offset(x, y))
 
                 val tooltipText =
-                    "${PowerChartPresenter.formatElapsed(selected.elapsedSeconds)} · " +
-                        "${selected.powerWatts} W"
+                    "${TrackChartPresenter.formatElapsed(selected.elapsedSeconds)} · " +
+                        "${selected.value} $unit"
                 val layout = textMeasurer.measure(AnnotatedString(tooltipText), tooltipStyle)
                 val tooltipPadding = 6.dp.toPx()
                 val tooltipWidth = layout.size.width + tooltipPadding * 2
@@ -416,12 +422,12 @@ private data class ChartGeometry(
     val plotWidth: Float get() = plotRight - plotLeft
     val plotHeight: Float get() = plotBottom - plotTop
 
-    fun secondsToX(window: PowerChartWindow, elapsedSeconds: Long): Float {
+    fun secondsToX(window: TrackChartWindow, elapsedSeconds: Long): Float {
         val duration = window.durationSeconds.coerceAtLeast(1)
         return plotLeft + plotWidth * (elapsedSeconds - window.startSeconds) / duration
     }
 
-    fun xToSeconds(window: PowerChartWindow, x: Float): Long {
+    fun xToSeconds(window: TrackChartWindow, x: Float): Long {
         if (plotWidth <= 0f) return window.startSeconds
         val fraction = ((x - plotLeft) / plotWidth).coerceIn(0f, 1f)
         return window.startSeconds + (fraction * window.durationSeconds).roundToLong()
@@ -440,12 +446,12 @@ private fun chartGeometry(size: IntSize): ChartGeometry {
 }
 
 private fun sampleAt(
-    samples: List<PowerChartSample>,
-    window: PowerChartWindow,
+    samples: List<TrackChartSample>,
+    window: TrackChartWindow,
     geometry: ChartGeometry,
     x: Float,
-): PowerChartSample? {
-    val sample = PowerChartPresenter.nearestSample(samples, geometry.xToSeconds(window, x))
+): TrackChartSample? {
+    val sample = TrackChartPresenter.nearestSample(samples, geometry.xToSeconds(window, x))
     return sample?.takeIf { it.elapsedSeconds in window.startSeconds..window.endSeconds }
 }
 

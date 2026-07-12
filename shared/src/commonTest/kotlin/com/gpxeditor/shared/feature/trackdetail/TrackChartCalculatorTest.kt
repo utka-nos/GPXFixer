@@ -8,7 +8,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-class PowerChartCalculatorTest {
+class TrackChartCalculatorTest {
     @Test
     fun buildsElapsedTimeSeriesFromTimedPowerPoints() {
         val document = documentWithPoints(
@@ -17,13 +17,13 @@ class PowerChartCalculatorTest {
             ActivityPoint(time = "2026-05-31T08:01:00Z", powerWatts = 180),
         )
 
-        val samples = PowerChartCalculator.samplesFor(document)
+        val samples = TrackChartCalculator.powerSamplesFor(document)
 
         assertEquals(
             listOf(
-                PowerChartSample(elapsedSeconds = 0, powerWatts = 200),
-                PowerChartSample(elapsedSeconds = 5, powerWatts = 250),
-                PowerChartSample(elapsedSeconds = 60, powerWatts = 180),
+                TrackChartSample(elapsedSeconds = 0, value = 200),
+                TrackChartSample(elapsedSeconds = 5, value = 250),
+                TrackChartSample(elapsedSeconds = 60, value = 180),
             ),
             samples,
         )
@@ -39,12 +39,12 @@ class PowerChartCalculatorTest {
             ActivityPoint(time = "2026-05-31T08:00:04Z", powerWatts = 220),
         )
 
-        val samples = PowerChartCalculator.samplesFor(document)
+        val samples = TrackChartCalculator.powerSamplesFor(document)
 
         assertEquals(
             listOf(
-                PowerChartSample(elapsedSeconds = 0, powerWatts = 200),
-                PowerChartSample(elapsedSeconds = 4, powerWatts = 220),
+                TrackChartSample(elapsedSeconds = 0, value = 200),
+                TrackChartSample(elapsedSeconds = 4, value = 220),
             ),
             samples,
         )
@@ -74,10 +74,10 @@ class PowerChartCalculatorTest {
             ),
         )
 
-        val samples = PowerChartCalculator.samplesFor(document)
+        val samples = TrackChartCalculator.powerSamplesFor(document)
 
         assertEquals(listOf(0L, 10L, 20L), samples.map { it.elapsedSeconds })
-        assertEquals(listOf(100, 110, 120), samples.map { it.powerWatts })
+        assertEquals(listOf(100, 110, 120), samples.map { it.value })
         assertEquals(listOf(0, 1, 2), samples.map { it.segmentIndex })
     }
 
@@ -89,13 +89,13 @@ class PowerChartCalculatorTest {
             ActivityPoint(time = "2026-05-31T08:00:05Z", powerWatts = 250),
         )
 
-        val samples = PowerChartCalculator.samplesFor(document)
+        val samples = TrackChartCalculator.powerSamplesFor(document)
 
         assertEquals(
             listOf(
-                PowerChartSample(elapsedSeconds = 0, powerWatts = 200),
-                PowerChartSample(elapsedSeconds = 5, powerWatts = 250),
-                PowerChartSample(elapsedSeconds = 60, powerWatts = 180),
+                TrackChartSample(elapsedSeconds = 0, value = 200),
+                TrackChartSample(elapsedSeconds = 5, value = 250),
+                TrackChartSample(elapsedSeconds = 60, value = 180),
             ),
             samples,
         )
@@ -108,7 +108,7 @@ class PowerChartCalculatorTest {
             ActivityPoint(time = "2026-05-31T08:00:01Z"),
         )
 
-        assertTrue(PowerChartCalculator.samplesFor(document).isEmpty())
+        assertTrue(TrackChartCalculator.powerSamplesFor(document).isEmpty())
     }
 
     @Test
@@ -118,7 +118,7 @@ class PowerChartCalculatorTest {
             ActivityPoint(time = "2026-05-31T08:00:01Z"),
         )
 
-        assertTrue(PowerChartCalculator.samplesFor(document).isEmpty())
+        assertTrue(TrackChartCalculator.powerSamplesFor(document).isEmpty())
     }
 
     private fun documentWithPoints(vararg points: ActivityPoint): ActivityDocument {

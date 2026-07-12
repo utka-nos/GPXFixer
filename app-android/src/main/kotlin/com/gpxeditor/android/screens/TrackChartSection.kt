@@ -20,19 +20,22 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import com.gpxeditor.shared.feature.trackdetail.PowerChartSample
+import com.gpxeditor.shared.feature.trackdetail.TrackChartSample
 
+/** Inline metric-over-time chart card on the track detail screen. */
 @Composable
-fun PowerChartSection(
-    samples: List<PowerChartSample>,
+fun TrackChartSection(
+    title: String,
+    unit: String,
+    samples: List<TrackChartSample>,
     onOpenChart: (() -> Unit)? = null,
 ) {
     if (samples.size < 2) return
-    val maxPower = samples.maxOf { it.powerWatts }
+    val maxValue = samples.maxOf { it.value }
     val totalSeconds = samples.maxOf { it.elapsedSeconds }
-    if (maxPower <= 0 || totalSeconds <= 0) return
+    if (maxValue <= 0 || totalSeconds <= 0) return
 
-    DetailSection(title = "Power") {
+    DetailSection(title = title) {
         val lineColor = MaterialTheme.colorScheme.primary
         val gridColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
 
@@ -57,7 +60,7 @@ fun PowerChartSection(
                 val areaPath = Path()
                 samples.forEachIndexed { index, sample ->
                     val x = size.width * sample.elapsedSeconds / totalSeconds
-                    val y = size.height * (1f - sample.powerWatts.toFloat() / maxPower)
+                    val y = size.height * (1f - sample.value.toFloat() / maxValue)
                     if (index == 0) {
                         linePath.moveTo(x, y)
                         areaPath.moveTo(x, size.height)
@@ -78,7 +81,7 @@ fun PowerChartSection(
                 )
             }
             Text(
-                text = "$maxPower W",
+                text = "$maxValue $unit",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier
@@ -86,7 +89,7 @@ fun PowerChartSection(
                     .padding(4.dp),
             )
             Text(
-                text = "0 W",
+                text = "0 $unit",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier
@@ -98,7 +101,9 @@ fun PowerChartSection(
                     modifier = Modifier
                         .fillMaxSize()
                         .clickable(onClick = onOpenChart)
-                        .semantics { contentDescription = "Open full-screen power chart" },
+                        .semantics {
+                            contentDescription = "Open full-screen ${title.lowercase()} chart"
+                        },
                 )
             }
         }

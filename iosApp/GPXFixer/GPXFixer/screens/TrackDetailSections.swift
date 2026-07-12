@@ -2,23 +2,25 @@ import SwiftUI
 import Charts
 import shared
 
-struct PowerChartSection: View {
-    let samples: [PowerChartSample]
+/// Inline metric-over-time chart section on the track detail screen.
+struct TrackChartSection: View {
+    let metric: TrackChartMetric
+    let samples: [TrackChartSample]
 
     var body: some View {
         if samples.count >= 2 {
-            Section("Power") {
+            Section(metric.title) {
                 NavigationLink {
-                    IOSPowerChartScreen(samples: samples)
+                    IOSTrackChartScreen(metric: metric, samples: samples)
                 } label: {
                     Chart(Array(samples.enumerated()), id: \.offset) { _, sample in
                         LineMark(
                             x: .value("Time", Double(sample.elapsedSeconds) / 60.0),
-                            y: .value("Power", Int(sample.powerWatts))
+                            y: .value(metric.title, Int(sample.value))
                         )
                         AreaMark(
                             x: .value("Time", Double(sample.elapsedSeconds) / 60.0),
-                            y: .value("Power", Int(sample.powerWatts))
+                            y: .value(metric.title, Int(sample.value))
                         )
                         .foregroundStyle(.linearGradient(
                             colors: [.accentColor.opacity(0.25), .accentColor.opacity(0.02)],
@@ -27,12 +29,12 @@ struct PowerChartSection: View {
                         ))
                     }
                     .chartXAxisLabel("Time, min")
-                    .chartYAxisLabel("Power, W")
+                    .chartYAxisLabel("\(metric.title), \(metric.unit)")
                     .frame(height: 180)
                     .padding(.vertical, 8)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Open full-screen power chart")
+                .accessibilityLabel("Open full-screen \(metric.title.lowercased()) chart")
             }
         }
     }

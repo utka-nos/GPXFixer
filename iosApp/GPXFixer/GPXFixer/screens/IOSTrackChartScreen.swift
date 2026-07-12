@@ -2,20 +2,38 @@ import SwiftUI
 import Charts
 import shared
 
-/// Full-screen power-over-time chart. One finger scrubs a selection crosshair;
-/// pinching zooms the visible time window and two-finger drags pan it.
-struct IOSPowerChartScreen: View {
-    let samples: [PowerChartSample]
+/// Names and units of the metric a track chart displays.
+struct TrackChartMetric {
+    let title: String
+    let unit: String
+    /// Spelled-out unit for spoken accessibility text, e.g. "watts".
+    let unitLong: String
+    /// SF Symbol shown when there is not enough data to draw a chart.
+    let emptyIcon: String
 
-    @State private var window: PowerChartWindow?
-    @State private var selectedSample: PowerChartSample?
+    static let power = TrackChartMetric(
+        title: "Power",
+        unit: "W",
+        unitLong: "watts",
+        emptyIcon: "bolt"
+    )
+}
+
+/// Full-screen metric-over-time chart. One finger scrubs a selection crosshair;
+/// pinching zooms the visible time window and two-finger drags pan it.
+struct IOSTrackChartScreen: View {
+    let metric: TrackChartMetric
+    let samples: [TrackChartSample]
+
+    @State private var window: TrackChartWindow?
+    @State private var selectedSample: TrackChartSample?
     @State private var isMagnifying = false
-    @State private var magnifyStartWindow: PowerChartWindow?
+    @State private var magnifyStartWindow: TrackChartWindow?
     @State private var magnifyFocusSeconds: Int64?
     @State private var lastPanX: CGFloat?
 
-    private var presenter: PowerChartPresenter { PowerChartPresenter.shared }
-    private var fullWindow: PowerChartWindow? { presenter.fullWindow(samples: samples) }
+    private var presenter: TrackChartPresenter { TrackChartPresenter.shared }
+    private var fullWindow: TrackChartWindow? { presenter.fullWindow(samples: samples) }
 
     var body: some View {
         Group {
@@ -23,18 +41,20 @@ struct IOSPowerChartScreen: View {
                 chartContent(fullWindow: fullWindow)
             } else {
                 ContentUnavailableView(
-                    "Not enough power data",
-                    systemImage: "bolt",
-                    description: Text("This track does not have enough power samples to draw a chart.")
+                    "Not enough \(metric.title.lowercased()) data",
+                    systemImage: metric.emptyIcon,
+                    description: Text(
+                        "This track does not have enough \(metric.title.lowercased()) samples to draw a chart."
+                    )
                 )
             }
         }
-        .navigationTitle("Power")
+        .navigationTitle(metric.title)
         .navigationBarTitleDisplayMode(.inline)
     }
 
     @ViewBuilder
-    private func chartContent(fullWindow: PowerChartWindow) -> some View {
+    private func chartContent(fullWindow: TrackChartWindow) -> some View {
         let activeWindow = window ?? fullWindow
         let presentation = presenter.presentation(
             samples: samples,
@@ -73,12 +93,12 @@ struct IOSPowerChartScreen: View {
         .accessibilityElement(children: .contain)
     }
 
-    private func chart(presentation: PowerChartPresentation, activeWindow: PowerChartWindow) -> some View {
+    private func chart(presentation: TrackChartPresentation, activeWindow: TrackChartWindow) -> some View {
         let timeLabels = Dictionary(
             uniqueKeysWithValues: presentation.timeTicks.map { ($0.elapsedSeconds, $0.label) }
         )
-        let powerLabels = Dictionary(
-            uniqueKeysWithValues: presentation.powerTicks.map { ($0.powerWatts, $0.label) }
+        let valueLabels = Dictionary(
+            uniqueKeysWithValues: presentation.valueTicks.map { ($0.value, $0.label) }
         )
 
         return Chart {
@@ -86,12 +106,12 @@ struct IOSPowerChartScreen: View {
                 ForEach(segment, id: \.elapsedSeconds) { sample in
                     LineMark(
                         x: .value("Time", Double(sample.elapsedSeconds)),
-                        y: .value("Power", Int(sample.powerWatts)),
+                        y: .value(metric.title, Int(sample.value)),
                         series: .value("Segment", segmentIndex)
                     )
                     AreaMark(
                         x: .value("Time", Double(sample.elapsedSeconds)),
-                        y: .value("Power", Int(sample.powerWatts)),
+                        y: .value(metric.title, Int(sample.value)),
                         series: .value("Segment", segmentIndex),
                         stacking: .unstacked
                     )
@@ -121,12 +141,12 @@ struct IOSPowerChartScreen: View {
                     }
                 PointMark(
                     x: .value("Time", Double(selected.elapsedSeconds)),
-                    y: .value("Power", Int(selected.powerWatts))
+                    y: .value(metric.title, Int(selected.value))
                 )
             }
         }
         .chartXScale(domain: Double(activeWindow.startSeconds)...Double(activeWindow.endSeconds))
-        .chartYScale(domain: 0...Double(presentation.axisMaxWatts))
+        .chartYScale(domain: 0...Double(presentation.axisMaxValue))
         .chartXAxis {
             AxisMarks(values: presentation.timeTicks.map { Double($0.elapsedSeconds) }) { value in
                 AxisGridLine()
@@ -140,19 +160,19 @@ struct IOSPowerChartScreen: View {
             }
         }
         .chartYAxis {
-            AxisMarks(values: presentation.powerTicks.map { Int($0.powerWatts) }) { value in
+            AxisMarks(values: presentation.valueTicks.map { Int($0.value) }) { value in
                 AxisGridLine()
                 AxisTick()
                 AxisValueLabel {
-                    if let watts = value.as(Int.self),
-                       let label = powerLabels[Int32(watts)] {
+                    if let metricValue = value.as(Int.self),
+                       let label = valueLabels[Int32(metricValue)] {
                         Text(label)
                     }
                 }
             }
         }
         .chartXAxisLabel("Elapsed time")
-        .chartYAxisLabel("Power, W")
+        .chartYAxisLabel("\(metric.title), \(metric.unit)")
         .chartOverlay { proxy in
             GeometryReader { geometry in
                 Rectangle()
@@ -237,7 +257,7 @@ struct IOSPowerChartScreen: View {
         return Int64(seconds.rounded())
     }
 
-    private func sample(atX x: CGFloat, proxy: ChartProxy, geometry: GeometryProxy) -> PowerChartSample? {
+    private func sample(atX x: CGFloat, proxy: ChartProxy, geometry: GeometryProxy) -> TrackChartSample? {
         guard let seconds = elapsedSeconds(atX: x, proxy: proxy, geometry: geometry),
               let activeWindow = window ?? fullWindow else { return nil }
         let clamped = min(max(seconds, activeWindow.startSeconds), activeWindow.endSeconds)
@@ -247,41 +267,41 @@ struct IOSPowerChartScreen: View {
         return nearest
     }
 
-    private func summaryText(_ presentation: PowerChartPresentation) -> String {
+    private func summaryText(_ presentation: TrackChartPresentation) -> String {
         var parts: [String] = []
-        if let average = presentation.averagePowerWatts {
-            parts.append("Avg \(average.intValue) W")
+        if let average = presentation.averageValue {
+            parts.append("Avg \(average.intValue) \(metric.unit)")
         }
-        if let maximum = presentation.maxPowerWatts {
-            parts.append("Max \(maximum.intValue) W")
+        if let maximum = presentation.maxValue {
+            parts.append("Max \(maximum.intValue) \(metric.unit)")
         }
         guard !parts.isEmpty else { return "No samples in view" }
         return parts.joined(separator: " · ") + " (visible range)"
     }
 
-    private func tooltipText(_ sample: PowerChartSample) -> String {
+    private func tooltipText(_ sample: TrackChartSample) -> String {
         let elapsed = presenter.formatElapsed(elapsedSeconds: sample.elapsedSeconds)
-        return "\(elapsed) · \(sample.powerWatts) W"
+        return "\(elapsed) · \(sample.value) \(metric.unit)"
     }
 
     private func accessibilityText(
-        _ presentation: PowerChartPresentation,
-        activeWindow: PowerChartWindow
+        _ presentation: TrackChartPresentation,
+        activeWindow: TrackChartWindow
     ) -> String {
-        var text = "Power chart from "
+        var text = "\(metric.title) chart from "
             + presenter.formatElapsed(elapsedSeconds: activeWindow.startSeconds)
             + " to "
             + presenter.formatElapsed(elapsedSeconds: activeWindow.endSeconds)
-        if let average = presentation.averagePowerWatts {
-            text += ", average \(average.intValue) watts"
+        if let average = presentation.averageValue {
+            text += ", average \(average.intValue) \(metric.unitLong)"
         }
-        if let maximum = presentation.maxPowerWatts {
-            text += ", maximum \(maximum.intValue) watts"
+        if let maximum = presentation.maxValue {
+            text += ", maximum \(maximum.intValue) \(metric.unitLong)"
         }
         if let selected = selectedSample {
             text += ". Selected point at "
                 + presenter.formatElapsed(elapsedSeconds: selected.elapsedSeconds)
-                + ", \(selected.powerWatts) watts"
+                + ", \(selected.value) \(metric.unitLong)"
         }
         return text
     }
@@ -291,12 +311,12 @@ struct IOSPowerChartScreen: View {
 /// ride, the thumb the visible window. Dragging it pans the window at the
 /// current zoom level.
 private struct ChartPanSlider: View {
-    let samples: [PowerChartSample]
-    let fullWindow: PowerChartWindow
-    let window: PowerChartWindow
-    let onWindowChange: (PowerChartWindow) -> Void
+    let samples: [TrackChartSample]
+    let fullWindow: TrackChartWindow
+    let window: TrackChartWindow
+    let onWindowChange: (TrackChartWindow) -> Void
 
-    @State private var windowAtDragStart: PowerChartWindow?
+    @State private var windowAtDragStart: TrackChartWindow?
 
     var body: some View {
         GeometryReader { geometry in
@@ -336,7 +356,7 @@ private struct ChartPanSlider: View {
                             (Double(value.translation.width) / trackWidth * fullDuration).rounded()
                         )
                         onWindowChange(
-                            PowerChartPresenter.shared.panned(
+                            TrackChartPresenter.shared.panned(
                                 samples: samples,
                                 window: startWindow,
                                 deltaSeconds: deltaSeconds
