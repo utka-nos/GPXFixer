@@ -1,6 +1,7 @@
 package com.gpxeditor.android.screens
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -16,11 +17,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.gpxeditor.shared.feature.trackdetail.PowerChartSample
 
 @Composable
-fun PowerChartSection(samples: List<PowerChartSample>) {
+fun PowerChartSection(
+    samples: List<PowerChartSample>,
+    onOpenChart: (() -> Unit)? = null,
+) {
     if (samples.size < 2) return
     val maxPower = samples.maxOf { it.powerWatts }
     val totalSeconds = samples.maxOf { it.elapsedSeconds }
@@ -87,6 +93,14 @@ fun PowerChartSection(samples: List<PowerChartSample>) {
                     .align(Alignment.BottomStart)
                     .padding(4.dp),
             )
+            if (onOpenChart != null) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clickable(onClick = onOpenChart)
+                        .semantics { contentDescription = "Open full-screen power chart" },
+                )
+            }
         }
 
         Row(

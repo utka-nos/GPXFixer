@@ -8,25 +8,31 @@ struct PowerChartSection: View {
     var body: some View {
         if samples.count >= 2 {
             Section("Power") {
-                Chart(Array(samples.enumerated()), id: \.offset) { _, sample in
-                    LineMark(
-                        x: .value("Time", Double(sample.elapsedSeconds) / 60.0),
-                        y: .value("Power", Int(sample.powerWatts))
-                    )
-                    AreaMark(
-                        x: .value("Time", Double(sample.elapsedSeconds) / 60.0),
-                        y: .value("Power", Int(sample.powerWatts))
-                    )
-                    .foregroundStyle(.linearGradient(
-                        colors: [.accentColor.opacity(0.25), .accentColor.opacity(0.02)],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    ))
+                NavigationLink {
+                    IOSPowerChartScreen(samples: samples)
+                } label: {
+                    Chart(Array(samples.enumerated()), id: \.offset) { _, sample in
+                        LineMark(
+                            x: .value("Time", Double(sample.elapsedSeconds) / 60.0),
+                            y: .value("Power", Int(sample.powerWatts))
+                        )
+                        AreaMark(
+                            x: .value("Time", Double(sample.elapsedSeconds) / 60.0),
+                            y: .value("Power", Int(sample.powerWatts))
+                        )
+                        .foregroundStyle(.linearGradient(
+                            colors: [.accentColor.opacity(0.25), .accentColor.opacity(0.02)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        ))
+                    }
+                    .chartXAxisLabel("Time, min")
+                    .chartYAxisLabel("Power, W")
+                    .frame(height: 180)
+                    .padding(.vertical, 8)
                 }
-                .chartXAxisLabel("Time, min")
-                .chartYAxisLabel("Power, W")
-                .frame(height: 180)
-                .padding(.vertical, 8)
+                .buttonStyle(.plain)
+                .accessibilityLabel("Open full-screen power chart")
             }
         }
     }

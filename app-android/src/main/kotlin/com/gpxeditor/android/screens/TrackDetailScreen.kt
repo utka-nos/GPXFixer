@@ -40,12 +40,21 @@ fun TrackDetailScreen(
     onExportFitClick: () -> Unit,
 ) {
     var isMapFullScreen by remember { mutableStateOf(false) }
+    var isPowerChartFullScreen by remember { mutableStateOf(false) }
     var isRenameDialogVisible by remember { mutableStateOf(false) }
 
     if (isMapFullScreen) {
         TrackMapFullScreen(
             document = detail.document,
             onBackClick = { isMapFullScreen = false },
+        )
+        return
+    }
+
+    if (isPowerChartFullScreen) {
+        PowerChartFullScreen(
+            samples = detail.powerSamples,
+            onBackClick = { isPowerChartFullScreen = false },
         )
         return
     }
@@ -99,7 +108,10 @@ fun TrackDetailScreen(
             importedAt = detail.importedTrack.importedAt,
             summary = detail.summary,
         )
-        PowerChartSection(samples = detail.powerSamples)
+        PowerChartSection(
+            samples = detail.powerSamples,
+            onOpenChart = { isPowerChartFullScreen = true },
+        )
         WarningsSection(warnings = detail.warnings)
         TrackSegmentsSection(segments = detail.segments)
     }
