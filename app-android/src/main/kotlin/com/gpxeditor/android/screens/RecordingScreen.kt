@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -30,12 +31,14 @@ import com.gpxeditor.android.recording.RecordingPermissions
 import com.gpxeditor.android.recording.TrackRecordingService
 import com.gpxeditor.shared.feature.recordtrack.RecordingState
 import com.gpxeditor.shared.feature.recordtrack.RecordingStats
+import com.gpxeditor.shared.feature.recordtrack.RoutePoint
 import com.gpxeditor.shared.data.ble.PowerSensorRecordingStatus
 
 @Composable
 fun RecordingScreen(onBackClick: () -> Unit) {
     val context = LocalContext.current
     val stats by TrackRecordingService.stats.collectAsState()
+    val routeSegments by TrackRecordingService.routeSegments.collectAsState()
     val powerSensorStatus by TrackRecordingService.powerSensorStatus.collectAsState()
     var permissionsGranted by remember { mutableStateOf(RecordingPermissions.allGranted(context)) }
     var showStopConfirmation by remember { mutableStateOf(false) }
@@ -106,6 +109,7 @@ fun RecordingScreen(onBackClick: () -> Unit) {
         } else {
             ActiveRecordingContent(
                 stats = currentStats,
+                routeSegments = routeSegments,
                 powerSensorStatus = powerSensorStatus,
                 onPauseClick = { TrackRecordingService.pause(context) },
                 onResumeClick = { TrackRecordingService.resume(context) },
@@ -159,11 +163,19 @@ private fun IdleContent(
 @Composable
 private fun ActiveRecordingContent(
     stats: RecordingStats,
+    routeSegments: List<List<RoutePoint>>,
     powerSensorStatus: PowerSensorRecordingStatus,
     onPauseClick: () -> Unit,
     onResumeClick: () -> Unit,
     onStopClick: () -> Unit,
 ) {
+    LiveRecordingMap(
+        segments = routeSegments,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(240.dp),
+    )
+
     Text(
         text = formatDuration(stats.elapsedMillis),
         style = MaterialTheme.typography.displayLarge,

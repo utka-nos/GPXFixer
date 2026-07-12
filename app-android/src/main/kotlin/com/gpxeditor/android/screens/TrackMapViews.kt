@@ -29,6 +29,93 @@ import com.google.maps.android.compose.MapUiSettings
 import com.google.maps.android.compose.Polyline
 import com.google.maps.android.compose.rememberCameraPositionState
 import com.gpxeditor.shared.domain.activity.ActivityDocument
+import com.gpxeditor.shared.feature.recordtrack.RoutePoint
+
+/**
+ * Map for the recording screen: draws the route recorded so far (one polyline
+ * per pause/resume segment) and keeps the camera on the latest position. The
+ * camera only moves when a new point arrives, so it stays still while paused.
+ */
+@Composable
+fun LiveRecordingMap(
+    segments: List<List<RoutePoint>>,
+    modifier: Modifier = Modifier,
+) {
+    val polylines = remember(segments) {
+        segments.map { segment ->
+            decimateForDisplay(segment).map { LatLng(it.latitude, it.longitude) }
+        }
+    }
+    val currentPosition = polylines.lastOrNull()?.lastOrNull()
+
+    val cameraPositionState = rememberCameraPositionState()
+    var mapLoaded by remember { mutableStateOf(false) }
+    var cameraInitialized by remember { mutableStateOf(false) }
+
+    LaunchedEffect(mapLoaded, currentPosition) {
+        if (!mapLoaded || currentPosition == null) return@LaunchedEffect
+
+        if (cameraInitialized) {
+            cameraPositionState.animate(CameraUpdateFactory.newLatLng(currentPosition))
+        } else {
+            cameraPositionState.move(
+                CameraUpdateFactory.newLatLngZoom(currentPosition, LIVE_MAP_ZOOM),
+            )
+            cameraInitialized = true
+        }
+    }
+
+    GoogleMap(
+        modifier = modifier,
+        cameraPositionState = cameraPositionState,
+        uiSettings = MapUiSettings(
+            compassEnabled = false,
+            indoorLevelPickerEnabled = false,
+            mapToolbarEnabled = false,
+            myLocationButtonEnabled = false,
+            rotationGesturesEnabled = false,
+            scrollGesturesEnabled = false,
+            scrollGesturesEnabledDuringRotateOrZoom = false,
+            tiltGesturesEnabled = false,
+            zoomControlsEnabled = false,
+            zoomGesturesEnabled = false,
+        ),
+        onMapLoaded = { mapLoaded = true },
+    ) {
+        polylines.forEach { points ->
+            Polyline(
+                points = points,
+                color = Color(0xFF1E88E5),
+                width = 8f,
+            )
+        }
+    }
+}
+
+/**
+ * Caps the number of rendered points per segment so redrawing the polyline
+ * stays cheap on multi-hour recordings. Keeps every stride-th point plus the
+ * last one, which is enough fidelity for a small live map.
+ */
+private fun decimateForDisplay(
+    points: List<RoutePoint>,
+    maxPoints: Int = MAX_DISPLAY_POINTS_PER_SEGMENT,
+): List<RoutePoint> {
+    if (points.size <= maxPoints) return points
+
+    val stride = (points.size + maxPoints - 1) / maxPoints
+    val result = ArrayList<RoutePoint>(maxPoints + 1)
+    for (index in points.indices step stride) {
+        result += points[index]
+    }
+    if (result.last() != points.last()) {
+        result += points.last()
+    }
+    return result
+}
+
+private const val LIVE_MAP_ZOOM = 16f
+private const val MAX_DISPLAY_POINTS_PER_SEGMENT = 1_000
 
 @Composable
 fun TrackMapSection(

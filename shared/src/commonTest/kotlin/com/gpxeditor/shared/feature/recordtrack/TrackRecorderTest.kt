@@ -213,6 +213,44 @@ class TrackRecorderTest {
     }
 
     @Test
+    fun routeSegmentsGrowWithAcceptedPointsOnly() {
+        val recorder = TrackRecorder()
+        recorder.start(atEpochMillis = T0)
+        assertEquals(emptyList(), recorder.routeSegments())
+
+        recorder.onLocation(sample(secondsAfterStart = 1, latitude = 55.000))
+        recorder.onLocation(sample(secondsAfterStart = 2, latitude = 55.001, accuracyMeters = 80.0))
+        recorder.onLocation(sample(secondsAfterStart = 3, latitude = 55.002))
+
+        assertEquals(
+            listOf(listOf(RoutePoint(55.000, 37.0), RoutePoint(55.002, 37.0))),
+            recorder.routeSegments(),
+        )
+    }
+
+    @Test
+    fun routeSegmentsSplitOnPauseResume() {
+        val recorder = TrackRecorder()
+        recorder.start(atEpochMillis = T0)
+        recorder.onLocation(sample(secondsAfterStart = 1, latitude = 55.000))
+
+        recorder.pause(atEpochMillis = T0 + 2_000)
+        // The empty segment opened by resume stays hidden until it gets a point.
+        recorder.resume(atEpochMillis = T0 + 10_000)
+        assertEquals(1, recorder.routeSegments().size)
+
+        recorder.onLocation(sample(secondsAfterStart = 11, latitude = 55.100))
+
+        assertEquals(
+            listOf(
+                listOf(RoutePoint(55.000, 37.0)),
+                listOf(RoutePoint(55.100, 37.0)),
+            ),
+            recorder.routeSegments(),
+        )
+    }
+
+    @Test
     fun emptyRecordingProducesDocumentWithoutTracks() {
         val recorder = TrackRecorder()
         recorder.start(atEpochMillis = T0)

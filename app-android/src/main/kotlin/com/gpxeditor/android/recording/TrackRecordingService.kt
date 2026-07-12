@@ -26,6 +26,7 @@ import com.gpxeditor.shared.feature.recordtrack.RecordedActivity
 import com.gpxeditor.shared.feature.recordtrack.RecordingJournal
 import com.gpxeditor.shared.feature.recordtrack.RecordingState
 import com.gpxeditor.shared.feature.recordtrack.RecordingStats
+import com.gpxeditor.shared.feature.recordtrack.RoutePoint
 import com.gpxeditor.shared.feature.recordtrack.SaveRecordedTrackRequest
 import com.gpxeditor.shared.feature.recordtrack.SaveRecordedTrackResult
 import com.gpxeditor.shared.feature.recordtrack.SaveRecordedTrackUseCase
@@ -106,6 +107,7 @@ class TrackRecordingService : Service() {
         if (recorder != null) {
             recorder = null
             _stats.value = null
+            _routeSegments.value = emptyList()
         }
         super.onDestroy()
     }
@@ -126,6 +128,7 @@ class TrackRecordingService : Service() {
         }
 
         _lastSaveMessage.value = null
+        _routeSegments.value = emptyList()
         val startedAt = now()
         val startedRecorder = TrackRecorder()
         recorder = startedRecorder
@@ -185,6 +188,7 @@ class TrackRecordingService : Service() {
 
         val recorded = recorder.stop(atEpochMillis = now())
         _stats.value = null
+        _routeSegments.value = emptyList()
         stopLocationUpdates()
         stopPowerSensor()
         tickerJob?.cancel()
@@ -228,6 +232,7 @@ class TrackRecordingService : Service() {
             AndroidLocationSource(this@TrackRecordingService).locations().collect { sample ->
                 if (recorder?.onLocation(sample) == true) {
                     appendToJournal { RecordingJournal.pointLine(sample) }
+                    recorder?.let { _routeSegments.value = it.routeSegments() }
                 }
             }
         }
@@ -329,6 +334,15 @@ class TrackRecordingService : Service() {
 
         /** Live stats of the active recording, or null when nothing is being recorded. */
         val stats: StateFlow<RecordingStats?> = _stats
+
+        private val _routeSegments = MutableStateFlow<List<List<RoutePoint>>>(emptyList())
+
+        /**
+         * Route of the active recording as coordinate segments, one per
+         * pause/resume span. Updated whenever a location becomes a track point;
+         * empty when nothing is being recorded or there is no GPS fix yet.
+         */
+        val routeSegments: StateFlow<List<List<RoutePoint>>> = _routeSegments
 
         private val _lastSaveMessage = MutableStateFlow<String?>(null)
 
