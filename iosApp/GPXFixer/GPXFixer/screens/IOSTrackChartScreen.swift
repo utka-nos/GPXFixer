@@ -24,6 +24,13 @@ struct TrackChartMetric {
         unitLong: "beats per minute",
         emptyIcon: "heart"
     )
+
+    static let speed = TrackChartMetric(
+        title: "Speed",
+        unit: "km/h",
+        unitLong: "kilometers per hour",
+        emptyIcon: "speedometer"
+    )
 }
 
 /// Full-screen metric-over-time chart. One finger scrubs a selection crosshair;

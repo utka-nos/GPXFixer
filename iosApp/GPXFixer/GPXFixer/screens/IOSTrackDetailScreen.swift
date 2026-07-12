@@ -35,6 +35,7 @@ struct IOSTrackDetailScreen: View {
 
                 TrackChartSection(metric: .power, samples: detail.powerSamples)
                 TrackChartSection(metric: .heartRate, samples: detail.heartRateSamples)
+                TrackChartSection(metric: .speed, samples: detail.speedSamples)
 
                 WarningsSection(warnings: detail.warnings)
                 TrackSegmentsSection(segments: detail.segments)

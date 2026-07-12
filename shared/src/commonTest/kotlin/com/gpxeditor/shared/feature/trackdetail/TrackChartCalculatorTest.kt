@@ -170,6 +170,128 @@ class TrackChartCalculatorTest {
         assertTrue(TrackChartCalculator.heartRateSamplesFor(document).isEmpty())
     }
 
+    @Test
+    fun buildsSpeedSeriesFromRecordedSpeeds() {
+        val document = documentWithPoints(
+            ActivityPoint(time = "2026-05-31T08:00:00Z", speedMetersPerSecond = 10.0),
+            ActivityPoint(time = "2026-05-31T08:00:05Z", speedMetersPerSecond = 5.0),
+            ActivityPoint(time = "2026-05-31T08:01:00Z", speedMetersPerSecond = 2.5),
+        )
+
+        val samples = TrackChartCalculator.speedSamplesFor(document)
+
+        assertEquals(
+            listOf(
+                TrackChartSample(elapsedSeconds = 0, value = 36),
+                TrackChartSample(elapsedSeconds = 5, value = 18),
+                TrackChartSample(elapsedSeconds = 60, value = 9),
+            ),
+            samples,
+        )
+    }
+
+    @Test
+    fun derivesSpeedFromGpsPointsWhenNotRecorded() {
+        // Consecutive points 0.001 degrees of latitude (~111.2 m) apart every
+        // 10 seconds: ~11.12 m/s, which rounds to 40 km/h.
+        val document = documentWithPoints(
+            ActivityPoint(time = "2026-05-31T08:00:00Z", latitude = 55.000, longitude = 37.0),
+            ActivityPoint(time = "2026-05-31T08:00:10Z", latitude = 55.001, longitude = 37.0),
+            ActivityPoint(time = "2026-05-31T08:00:20Z", latitude = 55.002, longitude = 37.0),
+        )
+
+        val samples = TrackChartCalculator.speedSamplesFor(document)
+
+        assertEquals(
+            listOf(
+                TrackChartSample(elapsedSeconds = 0, value = 40),
+                TrackChartSample(elapsedSeconds = 10, value = 40),
+            ),
+            samples,
+        )
+    }
+
+    @Test
+    fun prefersRecordedSpeedOverDerivedSpeed() {
+        val document = documentWithPoints(
+            ActivityPoint(time = "2026-05-31T08:00:00Z", latitude = 55.000, longitude = 37.0),
+            ActivityPoint(
+                time = "2026-05-31T08:00:10Z",
+                latitude = 55.001,
+                longitude = 37.0,
+                speedMetersPerSecond = 5.0,
+            ),
+            ActivityPoint(time = "2026-05-31T08:00:20Z", latitude = 55.002, longitude = 37.0),
+        )
+
+        val samples = TrackChartCalculator.speedSamplesFor(document)
+
+        assertEquals(
+            listOf(
+                TrackChartSample(elapsedSeconds = 0, value = 18),
+                TrackChartSample(elapsedSeconds = 10, value = 40),
+            ),
+            samples,
+        )
+    }
+
+    @Test
+    fun doesNotDeriveSpeedAcrossSegments() {
+        val document = ActivityDocument(
+            tracks = listOf(
+                ActivityTrack(
+                    segments = listOf(
+                        ActivitySegment(
+                            points = listOf(
+                                ActivityPoint(time = "2026-05-31T08:00:00Z", latitude = 55.000, longitude = 37.0),
+                                ActivityPoint(time = "2026-05-31T08:00:10Z", latitude = 55.001, longitude = 37.0),
+                            ),
+                        ),
+                        ActivitySegment(
+                            points = listOf(
+                                ActivityPoint(time = "2026-05-31T08:10:00Z", latitude = 55.100, longitude = 37.0),
+                                ActivityPoint(time = "2026-05-31T08:10:10Z", latitude = 55.101, longitude = 37.0),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        )
+
+        val samples = TrackChartCalculator.speedSamplesFor(document)
+
+        assertEquals(
+            listOf(
+                TrackChartSample(elapsedSeconds = 0, value = 40, segmentIndex = 0),
+                TrackChartSample(elapsedSeconds = 600, value = 40, segmentIndex = 1),
+            ),
+            samples,
+        )
+    }
+
+    @Test
+    fun skipsDerivedSpeedWhenTimestampsDoNotAdvance() {
+        // The second point repeats the first timestamp, so only the third
+        // point yields a derived speed — one sample is not enough for a chart.
+        val document = documentWithPoints(
+            ActivityPoint(time = "2026-05-31T08:00:00Z", latitude = 55.000, longitude = 37.0),
+            ActivityPoint(time = "2026-05-31T08:00:00Z", latitude = 55.001, longitude = 37.0),
+            ActivityPoint(time = "2026-05-31T08:00:10Z", latitude = 55.002, longitude = 37.0),
+        )
+
+        assertTrue(TrackChartCalculator.speedSamplesFor(document).isEmpty())
+    }
+
+    @Test
+    fun returnsEmptyListWhenNoSpeedOrGpsData() {
+        val document = documentWithPoints(
+            ActivityPoint(time = "2026-05-31T08:00:00Z", powerWatts = 200),
+            ActivityPoint(time = "2026-05-31T08:00:01Z", powerWatts = 210),
+        )
+
+        assertTrue(TrackChartCalculator.speedSamplesFor(document).isEmpty())
+    }
+
     private fun documentWithPoints(vararg points: ActivityPoint): ActivityDocument {
         return ActivityDocument(
             tracks = listOf(
