@@ -163,6 +163,38 @@ class PowerChartPresenterTest {
     }
 
     @Test
+    fun sourceSegmentBoundaryBreaksTheLineEvenWhenTimestampsAreClose() {
+        val samples = listOf(
+            PowerChartSample(0, 200, segmentIndex = 0),
+            PowerChartSample(30, 210, segmentIndex = 0),
+            PowerChartSample(31, 220, segmentIndex = 1),
+            PowerChartSample(60, 230, segmentIndex = 1),
+        )
+
+        val presentation = PowerChartPresenter.presentation(samples, PowerChartWindow(0, 60))
+
+        assertEquals(2, presentation.segments.size)
+        assertEquals(listOf<Long>(0, 30), presentation.segments[0].map { it.elapsedSeconds })
+        assertEquals(listOf<Long>(31, 60), presentation.segments[1].map { it.elapsedSeconds })
+    }
+
+    @Test
+    fun duplicateTimestampAtSegmentBoundaryRemainsSplit() {
+        val samples = listOf(
+            PowerChartSample(0, 100, segmentIndex = 0),
+            PowerChartSample(10, 200, segmentIndex = 0),
+            PowerChartSample(10, 300, segmentIndex = 1),
+            PowerChartSample(20, 400, segmentIndex = 1),
+        )
+
+        val presentation = PowerChartPresenter.presentation(samples, PowerChartWindow(0, 20))
+
+        assertEquals(2, presentation.segments.size)
+        assertEquals(listOf(100, 200), presentation.segments[0].map { it.powerWatts })
+        assertEquals(listOf(300, 400), presentation.segments[1].map { it.powerWatts })
+    }
+
+    @Test
     fun duplicateTimestampsAreAveragedIntoOneSample() {
         val samples = listOf(
             PowerChartSample(0, 100),

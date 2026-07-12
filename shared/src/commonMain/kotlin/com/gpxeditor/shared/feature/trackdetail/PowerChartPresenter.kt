@@ -57,7 +57,9 @@ object PowerChartPresenter {
      */
     fun fullWindow(samples: List<PowerChartSample>): PowerChartWindow? {
         val collapsed = collapseDuplicates(samples)
-        if (collapsed.size < 2) return null
+        if (collapsed.size < 2 || collapsed.first().elapsedSeconds == collapsed.last().elapsedSeconds) {
+            return null
+        }
         return PowerChartWindow(collapsed.first().elapsedSeconds, collapsed.last().elapsedSeconds)
     }
 
@@ -189,12 +191,17 @@ object PowerChartPresenter {
             val elapsed = samples[index].elapsedSeconds
             var sum = 0.0
             var count = 0
-            while (index < samples.size && samples[index].elapsedSeconds == elapsed) {
+            val segmentIndex = samples[index].segmentIndex
+            while (
+                index < samples.size &&
+                samples[index].elapsedSeconds == elapsed &&
+                samples[index].segmentIndex == segmentIndex
+            ) {
                 sum += samples[index].powerWatts
                 count++
                 index++
             }
-            collapsed.add(PowerChartSample(elapsed, (sum / count + 0.5).toInt()))
+            collapsed.add(PowerChartSample(elapsed, (sum / count + 0.5).toInt(), segmentIndex))
         }
         return collapsed
     }
@@ -206,7 +213,10 @@ object PowerChartPresenter {
         for (sampleIndex in 1 until samples.size) {
             val sample = samples[sampleIndex]
             val previous = samples[sampleIndex - 1]
-            if (sample.elapsedSeconds - previous.elapsedSeconds > GAP_THRESHOLD_SECONDS) {
+            if (
+                sample.segmentIndex != previous.segmentIndex ||
+                sample.elapsedSeconds - previous.elapsedSeconds > GAP_THRESHOLD_SECONDS
+            ) {
                 segments.add(mutableListOf())
             }
             segments.last().add(sample)
