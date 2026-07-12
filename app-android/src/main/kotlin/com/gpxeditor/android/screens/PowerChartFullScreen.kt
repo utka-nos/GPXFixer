@@ -3,6 +3,7 @@ package com.gpxeditor.android.screens
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
@@ -19,6 +21,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
@@ -185,6 +188,81 @@ fun PowerChartFullScreen(
                     }
                 },
         )
+
+        ChartPanSlider(
+            samples = samples,
+            fullWindow = fullWindow,
+            window = currentWindow,
+            onWindowChange = { newWindow ->
+                window = newWindow
+                selectedSample = null
+            },
+        )
+    }
+}
+
+/**
+ * Scrollbar-style pan control under the chart: the track represents the whole
+ * ride, the thumb the visible window. Dragging it pans the window at the
+ * current zoom level.
+ */
+@Composable
+private fun ChartPanSlider(
+    samples: List<PowerChartSample>,
+    fullWindow: PowerChartWindow,
+    window: PowerChartWindow,
+    onWindowChange: (PowerChartWindow) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val currentWindow by rememberUpdatedState(window)
+    val currentOnWindowChange by rememberUpdatedState(onWindowChange)
+    val trackColor = MaterialTheme.colorScheme.surfaceVariant
+    val thumbColor = MaterialTheme.colorScheme.primary
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(16.dp)
+            .semantics { contentDescription = "Chart position. Drag to move the visible range" }
+            .pointerInput(samples, fullWindow) {
+                var windowAtDragStart = currentWindow
+                var draggedPx = 0f
+                detectHorizontalDragGestures(
+                    onDragStart = {
+                        windowAtDragStart = currentWindow
+                        draggedPx = 0f
+                    },
+                    onHorizontalDrag = { change, dragAmount ->
+                        change.consume()
+                        draggedPx += dragAmount
+                        val trackWidth = size.width
+                        if (trackWidth <= 0) return@detectHorizontalDragGestures
+                        val deltaSeconds =
+                            (draggedPx / trackWidth * fullWindow.durationSeconds).roundToLong()
+                        currentOnWindowChange(
+                            PowerChartPresenter.panned(samples, windowAtDragStart, deltaSeconds),
+                        )
+                    },
+                )
+            },
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val cornerRadius = CornerRadius(size.height / 2f)
+            drawRoundRect(color = trackColor, cornerRadius = cornerRadius)
+
+            val fullDuration = fullWindow.durationSeconds.coerceAtLeast(1)
+            val minThumbWidth = size.height * 2
+            val thumbWidth = (size.width * window.durationSeconds / fullDuration)
+                .coerceIn(minThumbWidth, size.width)
+            val thumbLeft = (size.width * (window.startSeconds - fullWindow.startSeconds) / fullDuration)
+                .coerceIn(0f, size.width - thumbWidth)
+            drawRoundRect(
+                color = thumbColor,
+                topLeft = Offset(thumbLeft, 0f),
+                size = Size(thumbWidth, size.height),
+                cornerRadius = cornerRadius,
+            )
+        }
     }
 }
 
