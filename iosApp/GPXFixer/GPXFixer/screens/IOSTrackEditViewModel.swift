@@ -61,6 +61,11 @@ final class IOSTrackEditViewModel: ObservableObject {
         errorMessage = nil
     }
 
+    func finishMovingPoint() {
+        movingPointIndex = nil
+        errorMessage = nil
+    }
+
     func moveSelectedPoint(
         latitude: Double,
         longitude: Double
@@ -79,7 +84,7 @@ final class IOSTrackEditViewModel: ObservableObject {
         } else if let success = result as? MoveGpxTrackPointResultSuccess {
             document = success.document
             selectedPointIndex = Int(success.movedPointIndex)
-            self.movingPointIndex = nil
+            self.movingPointIndex = Int(success.movedPointIndex)
             errorMessage = nil
             hasChanges = true
             // Undo restores a full pre-delete snapshot, which would silently
@@ -89,6 +94,39 @@ final class IOSTrackEditViewModel: ObservableObject {
         } else {
             errorMessage = "Failed to move track point."
         }
+    }
+
+    func nudgeMovingPoint(
+        latitudeDelta: Double,
+        longitudeDelta: Double
+    ) {
+        guard let movingPointIndex,
+              let coordinate = pointCoordinate(at: movingPointIndex) else {
+            return
+        }
+
+        moveSelectedPoint(
+            latitude: coordinate.latitude + latitudeDelta,
+            longitude: coordinate.longitude + longitudeDelta
+        )
+    }
+
+    private func pointCoordinate(at index: Int) -> (latitude: Double, longitude: Double)? {
+        var globalPointIndex = 0
+        for track in document.tracks {
+            for segment in track.segments {
+                for point in segment.points {
+                    if globalPointIndex == index {
+                        guard let latitude = point.latitude, let longitude = point.longitude else {
+                            return nil
+                        }
+                        return (latitude.doubleValue, longitude.doubleValue)
+                    }
+                    globalPointIndex += 1
+                }
+            }
+        }
+        return nil
     }
 
     func saveEditedTrack() -> ImportedTrack {
