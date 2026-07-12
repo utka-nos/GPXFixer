@@ -35,9 +35,10 @@ final class IOSPowerSensorViewModel: ObservableObject {
         facade.select(device: device) { [weak self] connected in
             guard let self else { return }
             self.isConnecting = false
+            // facade.select stops the scan either way; keep the UI flag in sync.
+            self.isScanning = false
             if connected.boolValue {
                 self.selected = SelectedPowerSensor(id: device.id, name: device.name)
-                self.isScanning = false
             } else {
                 self.errorMessage = "Could not connect to sensor"
             }
