@@ -5,7 +5,9 @@ import android.content.ClipData
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.provider.DocumentsContract
 import android.provider.OpenableColumns
+import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -158,7 +160,21 @@ class MainActivity : ComponentActivity() {
         if (intent?.action != Intent.ACTION_VIEW) return
 
         val uri = intent.data ?: return
-        importScreenController.importTrackFrom(uri)
+        if (AndroidImportFileName.isTelegramProvider(uri.authority)) {
+            Toast.makeText(
+                this,
+                R.string.telegram_import_name_warning,
+                Toast.LENGTH_LONG,
+            ).show()
+        }
+        val fileName = AndroidImportFileName.resolveViewIntent(
+            title = intent.getStringExtra(Intent.EXTRA_TITLE),
+            subject = intent.getStringExtra(Intent.EXTRA_SUBJECT),
+            clipLabel = intent.clipData?.description?.label?.toString(),
+            uriFileName = displayNameFor(uri),
+            mimeType = intent.type,
+        )
+        importScreenController.importTrackFrom(uri, fileName)
     }
 
     private fun readTextFrom(uri: Uri): String {
@@ -175,7 +191,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun displayNameFor(uri: Uri): String? {
-        if (uri.scheme == ContentResolver.SCHEME_CONTENT) {
+        val queriedDisplayName = if (uri.scheme == ContentResolver.SCHEME_CONTENT) {
             contentResolver.query(
                 uri,
                 arrayOf(OpenableColumns.DISPLAY_NAME),
@@ -185,14 +201,24 @@ class MainActivity : ComponentActivity() {
             )?.use { cursor ->
                 if (cursor.moveToFirst()) {
                     val index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-                    if (index >= 0) return cursor.getString(index)
+                    if (index >= 0) cursor.getString(index) else null
+                } else {
+                    null
                 }
             }
+        } else {
+            null
         }
 
-        return uri.lastPathSegment
-            ?.substringAfterLast('/')
-            ?.takeIf { it.isNotBlank() }
+        val documentId = runCatching {
+            if (DocumentsContract.isDocumentUri(this, uri)) DocumentsContract.getDocumentId(uri) else null
+        }.getOrNull()
+
+        return AndroidImportFileName.resolve(
+            queriedDisplayName = queriedDisplayName,
+            documentId = documentId,
+            lastPathSegment = uri.lastPathSegment,
+        )
     }
 
     private fun exportGpx(displayName: String, content: String) {

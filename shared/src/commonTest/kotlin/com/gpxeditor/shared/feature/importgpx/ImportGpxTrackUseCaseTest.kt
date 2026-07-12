@@ -51,7 +51,7 @@ class ImportGpxTrackUseCaseTest {
 
         val success = assertIs<ImportGpxTrackResult.Success>(result)
         assertEquals("track-1", success.importedTrack.id)
-        assertEquals("Evening Route", success.importedTrack.displayName)
+        assertEquals("route", success.importedTrack.displayName)
         assertEquals("route.gpx", success.importedTrack.originalFileName)
         assertEquals("2026-05-31T10:00:00Z", success.importedTrack.importedAt)
         assertEquals("tracks/track-1.activity.json", success.importedTrack.storageKey)
@@ -64,6 +64,110 @@ class ImportGpxTrackUseCaseTest {
         assertEquals("GPXFixer", savedDocument.metadata.source)
         assertEquals(2, savedDocument.pointCount)
         assertEquals(listOf(success.importedTrack), trackStore.tracks)
+    }
+
+    @Test
+    fun prefersFileNameOverGenericEmbeddedTrackName() = runSuspend {
+        val useCase = ImportGpxTrackUseCase(
+            fileStorage = FakeGpxTrackFileStorage(),
+            trackStore = FakeImportedTrackStore(),
+            idGenerator = FixedImportIdGenerator("track-1"),
+            clock = FixedImportClock("2026-05-31T10:00:00Z"),
+        )
+        val content = """
+            <gpx version="1.1" creator="Bike Computer">
+                <trk>
+                    <name>bike</name>
+                    <trkseg>
+                        <trkpt lat="41.7151" lon="44.8271" />
+                    </trkseg>
+                </trk>
+            </gpx>
+        """.trimIndent()
+
+        val result = useCase(
+            ImportGpxTrackRequest(
+                originalFileName = "2026-05-31 Morning Ride.gpx",
+                content = content,
+            ),
+        )
+
+        val success = assertIs<ImportGpxTrackResult.Success>(result)
+        assertEquals("2026-05-31 Morning Ride", success.importedTrack.displayName)
+    }
+
+    @Test
+    fun preservesUnicodeFileNameInsteadOfNumericEmbeddedName() = runSuspend {
+        val useCase = ImportGpxTrackUseCase(
+            fileStorage = FakeGpxTrackFileStorage(),
+            trackStore = FakeImportedTrackStore(),
+            idGenerator = FixedImportIdGenerator("track-1"),
+            clock = FixedImportClock("2026-05-31T10:00:00Z"),
+        )
+        val content = """
+            <gpx version="1.1" creator="GPXFixer">
+                <metadata><name>1752400123</name></metadata>
+                <trk><trkseg><trkpt lat="41.7151" lon="44.8271" /></trkseg></trk>
+            </gpx>
+        """.trimIndent()
+
+        val result = useCase(ImportGpxTrackRequest("залупа слона.gpx", content))
+
+        val success = assertIs<ImportGpxTrackResult.Success>(result)
+        assertEquals("залупа слона", success.importedTrack.displayName)
+        assertEquals("залупа слона.gpx", success.importedTrack.originalFileName)
+    }
+
+    @Test
+    fun fallsBackToEmbeddedNameWhenFileNameIsBlank() = runSuspend {
+        val useCase = ImportGpxTrackUseCase(
+            fileStorage = FakeGpxTrackFileStorage(),
+            trackStore = FakeImportedTrackStore(),
+            idGenerator = FixedImportIdGenerator("track-1"),
+            clock = FixedImportClock("2026-05-31T10:00:00Z"),
+        )
+        val content = """
+            <gpx version="1.1" creator="GPXFixer">
+                <metadata>
+                    <name>Evening Route</name>
+                </metadata>
+                <trk>
+                    <trkseg>
+                        <trkpt lat="41.7151" lon="44.8271" />
+                    </trkseg>
+                </trk>
+            </gpx>
+        """.trimIndent()
+
+        val result = useCase(
+            ImportGpxTrackRequest(
+                originalFileName = "   ",
+                content = content,
+            ),
+        )
+
+        val success = assertIs<ImportGpxTrackResult.Success>(result)
+        assertEquals("Evening Route", success.importedTrack.displayName)
+    }
+
+    @Test
+    fun fallsBackToUntitledTrackWhenNoNameIsAvailable() = runSuspend {
+        val useCase = ImportGpxTrackUseCase(
+            fileStorage = FakeGpxTrackFileStorage(),
+            trackStore = FakeImportedTrackStore(),
+            idGenerator = FixedImportIdGenerator("track-1"),
+            clock = FixedImportClock("2026-05-31T10:00:00Z"),
+        )
+
+        val result = useCase(
+            ImportGpxTrackRequest(
+                originalFileName = "",
+                content = "<gpx><trk><trkseg><trkpt lat=\"41.7151\" lon=\"44.8271\" /></trkseg></trk></gpx>",
+            ),
+        )
+
+        val success = assertIs<ImportGpxTrackResult.Success>(result)
+        assertEquals("Untitled track", success.importedTrack.displayName)
     }
 
     @Test

@@ -66,7 +66,7 @@ class ImportScreenController(
     var state by mutableStateOf(ImportScreenState())
         private set
 
-    fun importTrackFrom(uri: Uri) {
+    fun importTrackFrom(uri: Uri, originalFileName: String? = null) {
         state = state.copy(
             isImporting = true,
             selectedTrackDetail = null,
@@ -78,7 +78,7 @@ class ImportScreenController(
 
         Thread {
             runCatching {
-                val fileName = displayNameFor(uri) ?: "track"
+                val fileName = originalFileName?.takeIf { it.isNotBlank() } ?: displayNameFor(uri) ?: "track"
                 val outcome = if (fileName.endsWith(".fit", ignoreCase = true)) {
                     importFit(fileName, readBytesFrom(uri))
                 } else {

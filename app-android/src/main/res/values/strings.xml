@@ -4,4 +4,5 @@
     <string name="recording_notification_channel">Track recording</string>
     <string name="recording_notification_recording">Recording track</string>
     <string name="recording_notification_paused">Recording paused</string>
+    <string name="telegram_import_name_warning">Telegram may replace the original file name, so the imported track name may be incorrect.</string>
 </resources>

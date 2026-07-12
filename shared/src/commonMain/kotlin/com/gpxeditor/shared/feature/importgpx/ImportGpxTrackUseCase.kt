@@ -59,9 +59,9 @@ class ImportGpxTrackUseCase(
     }
 
     private fun displayNameFor(originalFileName: String, document: ActivityDocument): String {
-        return document.metadata.name?.trim()?.takeIf { it.isNotEmpty() }
+        return originalFileName.trim().removeSuffix(".gpx").removeSuffix(".GPX").takeIf { it.isNotEmpty() }
+            ?: document.metadata.name?.trim()?.takeIf { it.isNotEmpty() }
             ?: document.tracks.firstNotNullOfOrNull { it.name?.trim()?.takeIf(String::isNotEmpty) }
-            ?: originalFileName.trim().removeSuffix(".gpx").removeSuffix(".GPX").takeIf { it.isNotEmpty() }
             ?: "Untitled track"
     }
 }
