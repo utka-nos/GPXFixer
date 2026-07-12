@@ -232,7 +232,9 @@ class TrackRecordingService : Service() {
             AndroidLocationSource(this@TrackRecordingService).locations().collect { sample ->
                 if (recorder?.onLocation(sample) == true) {
                     appendToJournal { RecordingJournal.pointLine(sample) }
-                    recorder?.let { _routeSegments.value = it.routeSegments() }
+                    recorder?.let {
+                        _routeSegments.value = it.routeSegments(MAX_DISPLAY_POINTS_PER_SEGMENT)
+                    }
                 }
             }
         }
@@ -378,6 +380,7 @@ class TrackRecordingService : Service() {
         private const val ACTION_PAUSE = "com.gpxeditor.android.recording.PAUSE"
         private const val ACTION_RESUME = "com.gpxeditor.android.recording.RESUME"
         private const val ACTION_STOP = "com.gpxeditor.android.recording.STOP"
+        private const val MAX_DISPLAY_POINTS_PER_SEGMENT = 1_000
 
         private const val CHANNEL_ID = "track_recording"
         private const val NOTIFICATION_ID = 1

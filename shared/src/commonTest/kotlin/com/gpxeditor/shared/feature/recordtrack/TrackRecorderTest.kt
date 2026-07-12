@@ -251,6 +251,23 @@ class TrackRecorderTest {
     }
 
     @Test
+    fun routeSegmentsRespectPointLimitAndKeepEndpoints() {
+        val recorder = TrackRecorder()
+        recorder.start(atEpochMillis = T0)
+        repeat(2_000) { index ->
+            recorder.onLocation(
+                sample(secondsAfterStart = (index + 1).toLong(), latitude = 55.0 + index * 0.00001),
+            )
+        }
+
+        val route = recorder.routeSegments(maxPointsPerSegment = 1_000).single()
+
+        assertEquals(1_000, route.size)
+        assertEquals(RoutePoint(55.0, 37.0), route.first())
+        assertEquals(RoutePoint(55.0 + 1_999 * 0.00001, 37.0), route.last())
+    }
+
+    @Test
     fun emptyRecordingProducesDocumentWithoutTracks() {
         val recorder = TrackRecorder()
         recorder.start(atEpochMillis = T0)

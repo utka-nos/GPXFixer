@@ -243,7 +243,7 @@ final class RecordingSession: NSObject, ObservableObject, CLLocationManagerDeleg
         }
 
         if routeChanged {
-            routeSegments = recorder.routeSegments().map { segment in
+            routeSegments = recorder.routeSegments(maxPointsPerSegment: 1_000).map { segment in
                 segment.map { point in
                     CLLocationCoordinate2D(latitude: point.latitude, longitude: point.longitude)
                 }

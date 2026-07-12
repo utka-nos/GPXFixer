@@ -103,13 +103,25 @@ class TrackRecorder(
     /**
      * Snapshot of the recorded route as coordinate segments. Each pause/resume
      * cycle produces a separate segment so the UI can draw them as disjoint
-     * polylines instead of connecting them across the gap.
+     * polylines instead of connecting them across the gap. When a point limit
+     * is supplied, samples are selected directly from the stored segment so
+     * creating a display snapshot has bounded cost.
      */
-    fun routeSegments(): List<List<RoutePoint>> {
+    fun routeSegments(maxPointsPerSegment: Int = Int.MAX_VALUE): List<List<RoutePoint>> {
+        require(maxPointsPerSegment >= 2) { "At least two route points must be retained." }
+
         return segments
             .filter { it.isNotEmpty() }
             .map { segment ->
-                segment.mapNotNull { point ->
+                val indexes = if (segment.size <= maxPointsPerSegment) {
+                    segment.indices
+                } else {
+                    List(maxPointsPerSegment) { index ->
+                        index * (segment.lastIndex.toLong()) / (maxPointsPerSegment - 1)
+                    }.map { it.toInt() }
+                }
+                indexes.mapNotNull { index ->
+                    val point = segment[index]
                     val latitude = point.latitude ?: return@mapNotNull null
                     val longitude = point.longitude ?: return@mapNotNull null
                     RoutePoint(latitude, longitude)
