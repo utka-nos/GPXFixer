@@ -32,6 +32,7 @@ import com.gpxeditor.android.recording.TrackRecordingService
 import com.gpxeditor.shared.feature.recordtrack.RecordingState
 import com.gpxeditor.shared.feature.recordtrack.RecordingStats
 import com.gpxeditor.shared.feature.recordtrack.RoutePoint
+import com.gpxeditor.shared.feature.trackdetail.TrackChartSample
 import com.gpxeditor.shared.data.ble.HeartRateSensorRecordingStatus
 import com.gpxeditor.shared.data.ble.PowerSensorRecordingStatus
 
@@ -40,6 +41,7 @@ fun RecordingScreen(onBackClick: () -> Unit) {
     val context = LocalContext.current
     val stats by TrackRecordingService.stats.collectAsState()
     val routeSegments by TrackRecordingService.routeSegments.collectAsState()
+    val powerChartSamples by TrackRecordingService.powerChartSamples.collectAsState()
     val powerSensorStatus by TrackRecordingService.powerSensorStatus.collectAsState()
     val heartRateSensorStatus by TrackRecordingService.heartRateSensorStatus.collectAsState()
     var permissionsGranted by remember { mutableStateOf(RecordingPermissions.allGranted(context)) }
@@ -112,6 +114,7 @@ fun RecordingScreen(onBackClick: () -> Unit) {
             ActiveRecordingContent(
                 stats = currentStats,
                 routeSegments = routeSegments,
+                powerChartSamples = powerChartSamples,
                 powerSensorStatus = powerSensorStatus,
                 heartRateSensorStatus = heartRateSensorStatus,
                 onPauseClick = { TrackRecordingService.pause(context) },
@@ -167,6 +170,7 @@ private fun IdleContent(
 private fun ActiveRecordingContent(
     stats: RecordingStats,
     routeSegments: List<List<RoutePoint>>,
+    powerChartSamples: List<TrackChartSample>,
     powerSensorStatus: PowerSensorRecordingStatus,
     heartRateSensorStatus: HeartRateSensorRecordingStatus,
     onPauseClick: () -> Unit,
@@ -191,6 +195,7 @@ private fun ActiveRecordingContent(
     StatRow(label = "Power", value = stats.currentPowerWatts?.let { "$it W" } ?: "—")
     StatRow(label = "Cadence", value = stats.currentCadenceRpm?.let { "$it rpm" } ?: "—")
     StatRow(label = "Heart rate", value = stats.currentHeartRateBpm?.let { "$it bpm" } ?: "—")
+    LivePowerChartSection(samples = powerChartSamples)
     Text(
         text = when (powerSensorStatus) {
             PowerSensorRecordingStatus.CONNECTED -> "Power sensor connected"
