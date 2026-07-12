@@ -29,7 +29,13 @@ struct IOSImportScreen: View {
                     NavigationLink {
                         IOSPowerSensorScreen()
                     } label: {
-                        Label("Sensors", systemImage: "sensor")
+                        Label("Power sensor", systemImage: "sensor")
+                    }
+
+                    NavigationLink {
+                        IOSHeartRateSensorScreen()
+                    } label: {
+                        Label("Heart rate sensor", systemImage: "heart")
                     }
 
                     if viewModel.isImporting {

@@ -73,9 +73,14 @@ struct IOSRecordingScreen: View {
                 statRow("Points", "\(stats.pointCount)")
                 statRow("Power", stats.currentPowerWatts.map { "\($0.intValue) W" } ?? "—")
                 statRow("Cadence", stats.currentCadenceRpm.map { "\($0.intValue) rpm" } ?? "—")
+                statRow("Heart rate", stats.currentHeartRateBpm.map { "\($0.intValue) bpm" } ?? "—")
                 Text(powerSensorStatusText)
                     .foregroundStyle(
                         session.powerSensorStatus == .connected ? Color.green : Color.secondary
+                    )
+                Text(heartRateSensorStatusText)
+                    .foregroundStyle(
+                        session.heartRateSensorStatus == .connected ? Color.green : Color.secondary
                     )
 
                 if stats.state == RecordingState.paused {
@@ -123,6 +128,21 @@ struct IOSRecordingScreen: View {
             return "No power sensor configured"
         default:
             return "Power sensor not connected"
+        }
+    }
+
+    private var heartRateSensorStatusText: String {
+        switch session.heartRateSensorStatus {
+        case .connected:
+            return "Heart rate sensor connected"
+        case .reconnecting:
+            return "Heart rate sensor reconnecting…"
+        case .notConnected:
+            return "Heart rate sensor not connected"
+        case .notConfigured:
+            return "No heart rate sensor configured"
+        default:
+            return "Heart rate sensor not connected"
         }
     }
 

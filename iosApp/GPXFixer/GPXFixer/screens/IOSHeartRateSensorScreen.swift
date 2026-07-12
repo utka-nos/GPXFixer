@@ -3,14 +3,14 @@ import Combine
 import shared
 
 @MainActor
-final class IOSPowerSensorViewModel: ObservableObject {
-    @Published var devices: [PowerSensorDevice] = []
-    @Published var selected: SelectedPowerSensor?
+final class IOSHeartRateSensorViewModel: ObservableObject {
+    @Published var devices: [HeartRateSensorDevice] = []
+    @Published var selected: SelectedHeartRateSensor?
     @Published var isScanning = false
     @Published var isConnecting = false
     @Published var errorMessage: String?
 
-    private let facade = IosPowerSensorFacade()
+    private let facade = IosHeartRateSensorFacade()
 
     init() {
         selected = facade.selectedSensor()
@@ -30,7 +30,7 @@ final class IOSPowerSensorViewModel: ObservableObject {
         }
     }
 
-    func select(_ device: PowerSensorDevice) {
+    func select(_ device: HeartRateSensorDevice) {
         isConnecting = true
         facade.select(device: device) { [weak self] connected in
             guard let self else { return }
@@ -38,7 +38,7 @@ final class IOSPowerSensorViewModel: ObservableObject {
             // facade.select stops the scan either way; keep the UI flag in sync.
             self.isScanning = false
             if connected.boolValue {
-                self.selected = SelectedPowerSensor(id: device.id, name: device.name)
+                self.selected = SelectedHeartRateSensor(id: device.id, name: device.name)
             } else {
                 self.errorMessage = "Could not connect to sensor"
             }
@@ -57,8 +57,8 @@ final class IOSPowerSensorViewModel: ObservableObject {
     }
 }
 
-struct IOSPowerSensorScreen: View {
-    @StateObject private var viewModel = IOSPowerSensorViewModel()
+struct IOSHeartRateSensorScreen: View {
+    @StateObject private var viewModel = IOSHeartRateSensorViewModel()
 
     var body: some View {
         List {
@@ -69,7 +69,7 @@ struct IOSPowerSensorScreen: View {
                 }
             }
 
-            Section("Nearby cycling power sensors") {
+            Section("Nearby heart rate sensors") {
                 if viewModel.isScanning || viewModel.isConnecting {
                     ProgressView(viewModel.isConnecting ? "Connecting…" : "Scanning…")
                 }
@@ -79,7 +79,7 @@ struct IOSPowerSensorScreen: View {
                 ForEach(viewModel.devices, id: \.id) { device in
                     Button { viewModel.select(device) } label: {
                         VStack(alignment: .leading) {
-                            Text(device.name ?? "Cycling power sensor")
+                            Text(device.name ?? "Heart rate sensor")
                             Text("RSSI \(device.rssi) dBm")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
@@ -89,7 +89,7 @@ struct IOSPowerSensorScreen: View {
                 }
             }
         }
-        .navigationTitle("Power sensor")
+        .navigationTitle("Heart rate sensor")
         .onAppear { viewModel.startScan() }
         .onDisappear { viewModel.stopScan() }
         .toolbar {

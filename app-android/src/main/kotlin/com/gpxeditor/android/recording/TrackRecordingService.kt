@@ -31,6 +31,10 @@ import com.gpxeditor.shared.feature.recordtrack.SaveRecordedTrackRequest
 import com.gpxeditor.shared.feature.recordtrack.SaveRecordedTrackResult
 import com.gpxeditor.shared.feature.recordtrack.SaveRecordedTrackUseCase
 import com.gpxeditor.shared.feature.recordtrack.TrackRecorder
+import com.gpxeditor.shared.data.ble.HeartRateSensorReconnectManager
+import com.gpxeditor.shared.data.ble.HeartRateSensorRecordingStatus
+import com.gpxeditor.shared.data.ble.HeartRateSensorSettingsStore
+import com.gpxeditor.shared.data.ble.KableHeartRateSensor
 import com.gpxeditor.shared.data.ble.KablePowerSensor
 import com.gpxeditor.shared.data.ble.PowerSensorSettingsStore
 import com.gpxeditor.shared.data.ble.PowerSensorReconnectManager
@@ -63,6 +67,9 @@ class TrackRecordingService : Service() {
     private var powerSensor: KablePowerSensor? = null
     private var powerSensorJob: Job? = null
     private var powerSampleJob: Job? = null
+    private var heartRateSensor: KableHeartRateSensor? = null
+    private var heartRateSensorJob: Job? = null
+    private var heartRateSampleJob: Job? = null
 
     // Single-threaded so journal lines land in order; also runs the final save.
     private val journalExecutor = Executors.newSingleThreadExecutor()
@@ -102,6 +109,10 @@ class TrackRecordingService : Service() {
         powerSensorJob = null
         powerSampleJob?.cancel()
         powerSampleJob = null
+        heartRateSensorJob?.cancel()
+        heartRateSensorJob = null
+        heartRateSampleJob?.cancel()
+        heartRateSampleJob = null
         scope.cancel()
         journalExecutor.shutdown()
         if (recorder != null) {
@@ -152,6 +163,7 @@ class TrackRecordingService : Service() {
         Log.i(RecordingPermissions.TAG, "Recording started in foreground service")
         startLocationUpdates()
         startPowerSensor()
+        startHeartRateSensor()
         tickerJob = scope.launch {
             while (isActive) {
                 publishStats()
@@ -191,6 +203,7 @@ class TrackRecordingService : Service() {
         _routeSegments.value = emptyList()
         stopLocationUpdates()
         stopPowerSensor()
+        stopHeartRateSensor()
         tickerJob?.cancel()
         tickerJob = null
 
@@ -247,7 +260,7 @@ class TrackRecordingService : Service() {
 
     private fun startPowerSensor() {
         if (powerSensorJob != null) return
-        if (!PowerSensorPermissions.allGranted(this)) {
+        if (!BleSensorPermissions.allGranted(this)) {
             _powerSensorStatus.value = PowerSensorRecordingStatus.NOT_CONNECTED
             return
         }
@@ -282,6 +295,43 @@ class TrackRecordingService : Service() {
         if (sensor != null) scope.launch { sensor.disconnect() }
     }
 
+    private fun startHeartRateSensor() {
+        if (heartRateSensorJob != null) return
+        if (!BleSensorPermissions.allGranted(this)) {
+            _heartRateSensorStatus.value = HeartRateSensorRecordingStatus.NOT_CONNECTED
+            return
+        }
+        val selected = HeartRateSensorSettingsStore(FileHeartRateSensorSettingsStorage(this)).load()
+        if (selected == null) {
+            _heartRateSensorStatus.value = HeartRateSensorRecordingStatus.NOT_CONFIGURED
+            return
+        }
+        val sensor = KableHeartRateSensor(scope)
+        heartRateSensor = sensor
+        heartRateSampleJob = scope.launch {
+            sensor.samples.collect { sample ->
+                recorder?.onHeartRate(sample, now())
+                publishStats()
+            }
+        }
+        heartRateSensorJob = scope.launch {
+            HeartRateSensorReconnectManager(sensor).run(selected.id) { status ->
+                _heartRateSensorStatus.value = status
+            }
+        }
+    }
+
+    private fun stopHeartRateSensor() {
+        heartRateSensorJob?.cancel()
+        heartRateSensorJob = null
+        heartRateSampleJob?.cancel()
+        heartRateSampleJob = null
+        val sensor = heartRateSensor
+        heartRateSensor = null
+        _heartRateSensorStatus.value = HeartRateSensorRecordingStatus.NOT_CONNECTED
+        if (sensor != null) scope.launch { sensor.disconnect() }
+    }
+
     private fun publishStats() {
         val currentStats = recorder?.stats(now()) ?: return
         _stats.value = currentStats
@@ -312,6 +362,7 @@ class TrackRecordingService : Service() {
         append(formatDistance(stats.distanceMeters))
         stats.currentPowerWatts?.let { append(" • $it W") }
         stats.currentCadenceRpm?.let { append(" • $it rpm") }
+        stats.currentHeartRateBpm?.let { append(" • $it bpm") }
     }
 
     private fun createNotificationChannel() {
@@ -355,6 +406,11 @@ class TrackRecordingService : Service() {
             MutableStateFlow(PowerSensorRecordingStatus.NOT_CONFIGURED)
 
         val powerSensorStatus: StateFlow<PowerSensorRecordingStatus> = _powerSensorStatus
+
+        private val _heartRateSensorStatus =
+            MutableStateFlow(HeartRateSensorRecordingStatus.NOT_CONFIGURED)
+
+        val heartRateSensorStatus: StateFlow<HeartRateSensorRecordingStatus> = _heartRateSensorStatus
 
         fun start(context: Context) {
             ContextCompat.startForegroundService(context, intent(context, ACTION_START))

@@ -25,12 +25,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.gpxeditor.android.recording.PowerSensorController
 import com.gpxeditor.android.recording.BleSensorPermissions
-import com.gpxeditor.shared.data.ble.PowerSensorConnectionState
+import com.gpxeditor.android.recording.HeartRateSensorController
+import com.gpxeditor.shared.data.ble.HeartRateSensorConnectionState
 
 @Composable
-fun PowerSensorScreen(controller: PowerSensorController, onBackClick: () -> Unit) {
+fun HeartRateSensorScreen(controller: HeartRateSensorController, onBackClick: () -> Unit) {
     val context = LocalContext.current
     val state by controller.state.collectAsState()
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -51,7 +51,7 @@ fun PowerSensorScreen(controller: PowerSensorController, onBackClick: () -> Unit
         Row(verticalAlignment = Alignment.CenterVertically) {
             Button(onClick = onBackClick) { Text("Back") }
         }
-        Text("Power sensor", style = MaterialTheme.typography.headlineMedium)
+        Text("Heart rate sensor", style = MaterialTheme.typography.headlineMedium)
 
         state.selected?.let { selected ->
             Text("Selected: ${selected.name ?: selected.id}")
@@ -59,15 +59,15 @@ fun PowerSensorScreen(controller: PowerSensorController, onBackClick: () -> Unit
         }
 
         when (val connection = state.connectionState) {
-            is PowerSensorConnectionState.Connecting -> Text("Connecting…")
-            is PowerSensorConnectionState.Connected -> Text("Connected", color = MaterialTheme.colorScheme.primary)
-            is PowerSensorConnectionState.Failed -> Text(connection.message, color = MaterialTheme.colorScheme.error)
+            is HeartRateSensorConnectionState.Connecting -> Text("Connecting…")
+            is HeartRateSensorConnectionState.Connected -> Text("Connected", color = MaterialTheme.colorScheme.primary)
+            is HeartRateSensorConnectionState.Failed -> Text(connection.message, color = MaterialTheme.colorScheme.error)
             else -> Unit
         }
         state.errorMessage?.let { Text(it, color = MaterialTheme.colorScheme.error) }
 
         if (!BleSensorPermissions.allGranted(context)) {
-            Text("Bluetooth permission is required to find cycling power sensors.")
+            Text("Bluetooth permission is required to find heart rate sensors.")
             Button(onClick = { permissionLauncher.launch(BleSensorPermissions.required()) }) {
                 Text("Allow Bluetooth")
             }
@@ -81,7 +81,7 @@ fun PowerSensorScreen(controller: PowerSensorController, onBackClick: () -> Unit
                     Column(
                         modifier = Modifier.fillMaxWidth().clickable { controller.select(device) }.padding(vertical = 14.dp),
                     ) {
-                        Text(device.name ?: "Cycling power sensor", style = MaterialTheme.typography.titleMedium)
+                        Text(device.name ?: "Heart rate sensor", style = MaterialTheme.typography.titleMedium)
                         Text("RSSI ${device.rssi} dBm", style = MaterialTheme.typography.bodyMedium)
                     }
                     HorizontalDivider()

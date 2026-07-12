@@ -17,12 +17,16 @@ import com.gpxeditor.android.data.imported.AndroidGpxTrackFileStorage
 import com.gpxeditor.android.data.imported.AndroidImportClock
 import com.gpxeditor.android.data.imported.AndroidImportIdGenerator
 import com.gpxeditor.android.data.imported.JsonImportedTrackStore
+import com.gpxeditor.android.recording.FileHeartRateSensorSettingsStorage
 import com.gpxeditor.android.recording.FileRecordingJournal
 import com.gpxeditor.android.recording.FilePowerSensorSettingsStorage
+import com.gpxeditor.android.recording.HeartRateSensorController
 import com.gpxeditor.android.recording.PowerSensorController
 import com.gpxeditor.android.recording.TrackRecordingService
 import com.gpxeditor.android.screens.ImportScreen
 import com.gpxeditor.shared.data.fit.FitActivityDecoder
+import com.gpxeditor.shared.data.ble.HeartRateSensorSettingsStore
+import com.gpxeditor.shared.data.ble.KableHeartRateSensor
 import com.gpxeditor.shared.data.ble.KablePowerSensor
 import com.gpxeditor.shared.data.ble.PowerSensorSettingsStore
 import com.gpxeditor.shared.feature.deletetrack.DeleteImportedTrackUseCase
@@ -42,8 +46,9 @@ import kotlinx.coroutines.cancel
 class MainActivity : ComponentActivity() {
     private lateinit var openGpxLauncher: ActivityResultLauncher<Array<String>>
     private lateinit var importScreenController: ImportScreenController
-    private val powerSensorScope = MainScope()
+    private val sensorScope = MainScope()
     private lateinit var powerSensorController: PowerSensorController
+    private lateinit var heartRateSensorController: HeartRateSensorController
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -53,9 +58,14 @@ class MainActivity : ComponentActivity() {
         val importIdGenerator = AndroidImportIdGenerator()
         val importClock = AndroidImportClock()
         powerSensorController = PowerSensorController(
-            scope = powerSensorScope,
-            sensor = KablePowerSensor(powerSensorScope),
+            scope = sensorScope,
+            sensor = KablePowerSensor(sensorScope),
             settings = PowerSensorSettingsStore(FilePowerSensorSettingsStorage(applicationContext)),
+        )
+        heartRateSensorController = HeartRateSensorController(
+            scope = sensorScope,
+            sensor = KableHeartRateSensor(sensorScope),
+            settings = HeartRateSensorSettingsStore(FileHeartRateSensorSettingsStorage(applicationContext)),
         )
         importScreenController = ImportScreenController(
             importGpxTrackUseCase = ImportGpxTrackUseCase(
@@ -137,6 +147,7 @@ class MainActivity : ComponentActivity() {
                 onRestoreRecording = importScreenController::restoreRecoveredRecording,
                 onDiscardRecording = importScreenController::discardRecoveredRecording,
                 powerSensorController = powerSensorController,
+                heartRateSensorController = heartRateSensorController,
             )
         }
 
@@ -152,7 +163,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
-        powerSensorScope.cancel()
+        sensorScope.cancel()
         super.onDestroy()
     }
 
