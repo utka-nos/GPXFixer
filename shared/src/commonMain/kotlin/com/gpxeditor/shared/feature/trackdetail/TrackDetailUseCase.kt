@@ -26,6 +26,7 @@ class TrackDetailUseCase(
                 summary = TrackSummaryCalculator.summaryFor(document),
                 segments = TrackSummaryCalculator.segmentSummariesFor(document),
                 warnings = TrackSummaryCalculator.warningsFor(document),
+                powerSamples = PowerChartCalculator.samplesFor(document),
             ),
         )
     }
@@ -63,6 +64,7 @@ data class TrackDetail(
     val summary: TrackSummary,
     val segments: List<TrackSegmentSummary>,
     val warnings: List<String>,
+    val powerSamples: List<PowerChartSample> = emptyList(),
 )
 
 data class TrackSummary(

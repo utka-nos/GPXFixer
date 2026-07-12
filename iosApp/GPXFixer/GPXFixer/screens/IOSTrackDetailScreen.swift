@@ -33,6 +33,8 @@ struct IOSTrackDetailScreen: View {
                     summary: detail.summary
                 )
 
+                PowerChartSection(samples: detail.powerSamples)
+
                 WarningsSection(warnings: detail.warnings)
                 TrackSegmentsSection(segments: detail.segments)
             }
