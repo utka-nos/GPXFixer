@@ -17,6 +17,10 @@ object TrackChartCalculator {
     fun powerSamplesFor(document: ActivityDocument): List<TrackChartSample> =
         samplesFor(document) { it.powerWatts }
 
+    /** The heart-rate-over-time series for a track, in beats per minute. */
+    fun heartRateSamplesFor(document: ActivityDocument): List<TrackChartSample> =
+        samplesFor(document) { it.heartRateBpm }
+
     /**
      * Builds a metric-over-time series for a track: one sample per point that
      * carries both a metric value and a parsable timestamp, with elapsed time

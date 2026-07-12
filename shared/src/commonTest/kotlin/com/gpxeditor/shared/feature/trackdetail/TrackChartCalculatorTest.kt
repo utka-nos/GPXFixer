@@ -121,6 +121,55 @@ class TrackChartCalculatorTest {
         assertTrue(TrackChartCalculator.powerSamplesFor(document).isEmpty())
     }
 
+    @Test
+    fun buildsElapsedTimeSeriesFromTimedHeartRatePoints() {
+        val document = documentWithPoints(
+            ActivityPoint(time = "2026-05-31T08:00:00Z", heartRateBpm = 120),
+            ActivityPoint(time = "2026-05-31T08:00:05Z", heartRateBpm = 135),
+            ActivityPoint(time = "2026-05-31T08:01:00Z", heartRateBpm = 150),
+        )
+
+        val samples = TrackChartCalculator.heartRateSamplesFor(document)
+
+        assertEquals(
+            listOf(
+                TrackChartSample(elapsedSeconds = 0, value = 120),
+                TrackChartSample(elapsedSeconds = 5, value = 135),
+                TrackChartSample(elapsedSeconds = 60, value = 150),
+            ),
+            samples,
+        )
+    }
+
+    @Test
+    fun heartRateSeriesIgnoresPowerOnlyPoints() {
+        val document = documentWithPoints(
+            ActivityPoint(time = "2026-05-31T08:00:00Z", heartRateBpm = 120, powerWatts = 200),
+            ActivityPoint(time = "2026-05-31T08:00:05Z", powerWatts = 250),
+            ActivityPoint(time = "2026-05-31T08:00:10Z", heartRateBpm = 140),
+        )
+
+        val samples = TrackChartCalculator.heartRateSamplesFor(document)
+
+        assertEquals(
+            listOf(
+                TrackChartSample(elapsedSeconds = 0, value = 120),
+                TrackChartSample(elapsedSeconds = 10, value = 140),
+            ),
+            samples,
+        )
+    }
+
+    @Test
+    fun returnsEmptyListWhenNoHeartRateData() {
+        val document = documentWithPoints(
+            ActivityPoint(time = "2026-05-31T08:00:00Z", powerWatts = 200),
+            ActivityPoint(time = "2026-05-31T08:00:01Z", powerWatts = 210),
+        )
+
+        assertTrue(TrackChartCalculator.heartRateSamplesFor(document).isEmpty())
+    }
+
     private fun documentWithPoints(vararg points: ActivityPoint): ActivityDocument {
         return ActivityDocument(
             tracks = listOf(
