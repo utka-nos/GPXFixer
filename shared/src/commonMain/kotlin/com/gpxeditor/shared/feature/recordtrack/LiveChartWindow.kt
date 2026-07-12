@@ -10,18 +10,19 @@ import com.gpxeditor.shared.feature.trackdetail.TrackChartWindow
  * user can pan back to review earlier parts of the ride.
  */
 object LiveChartWindow {
-    /** How much of the ride the chart shows while following new samples. */
-    const val SPAN_SECONDS = 300L
+    /** Fixed time scale of the chart while it follows live samples. */
+    const val SPAN_SECONDS = 60L
 
     /**
-     * The window that hugs the live edge: the last [SPAN_SECONDS] of the ride,
-     * or the whole ride when it is shorter. Null when there is not enough data
-     * to draw a chart (fewer than two distinct timestamps).
+     * The fixed-size window that hugs the live edge. During the first minute it
+     * stays at 0..[SPAN_SECONDS], leaving room for future samples; afterwards it
+     * shows the latest [SPAN_SECONDS]. Null when there is not enough data to
+     * draw a chart (fewer than two distinct timestamps).
      */
     fun liveWindow(samples: List<TrackChartSample>): TrackChartWindow? {
         val full = TrackChartPresenter.fullWindow(samples) ?: return null
-        val span = minOf(SPAN_SECONDS, full.durationSeconds)
-        return TrackChartWindow(full.endSeconds - span, full.endSeconds)
+        val endSeconds = maxOf(SPAN_SECONDS, full.endSeconds)
+        return TrackChartWindow(endSeconds - SPAN_SECONDS, endSeconds)
     }
 
     /** Shifts [window] by [deltaSeconds], clamped to the recorded ride. */

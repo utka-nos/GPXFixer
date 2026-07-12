@@ -21,11 +21,24 @@ class LiveChartWindowTest {
     }
 
     @Test
-    fun liveWindowSpansTheWholeRideWhileShorterThanTheSpan() {
-        val samples = rideSamples(durationSeconds = 120)
+    fun liveWindowKeepsTheFixedScaleDuringTheFirstMinute() {
+        val samples = rideSamples(durationSeconds = 20)
 
         assertEquals(
-            TrackChartWindow(startSeconds = 0, endSeconds = 120),
+            TrackChartWindow(startSeconds = 0, endSeconds = 60),
+            LiveChartWindow.liveWindow(samples),
+        )
+    }
+
+    @Test
+    fun liveWindowStartsAtZeroWhenPowerSamplesBeginPartwayThroughTheFirstMinute() {
+        val samples = listOf(
+            TrackChartSample(elapsedSeconds = 30, value = 200),
+            TrackChartSample(elapsedSeconds = 40, value = 210),
+        )
+
+        assertEquals(
+            TrackChartWindow(startSeconds = 0, endSeconds = 60),
             LiveChartWindow.liveWindow(samples),
         )
     }
@@ -35,7 +48,7 @@ class LiveChartWindowTest {
         val samples = rideSamples(durationSeconds = 1_000)
 
         assertEquals(
-            TrackChartWindow(startSeconds = 700, endSeconds = 1_000),
+            TrackChartWindow(startSeconds = 940, endSeconds = 1_000),
             LiveChartWindow.liveWindow(samples),
         )
     }
@@ -47,7 +60,7 @@ class LiveChartWindowTest {
 
         val panned = LiveChartWindow.panned(samples, window, deltaSeconds = -10_000)
 
-        assertEquals(TrackChartWindow(startSeconds = 0, endSeconds = 300), panned)
+        assertEquals(TrackChartWindow(startSeconds = 0, endSeconds = 60), panned)
     }
 
     @Test
