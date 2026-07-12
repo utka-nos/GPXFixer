@@ -48,5 +48,7 @@ When the user asks to implement or complete a GitHub issue, perform the complete
 3. Create and check out a dedicated branch from `origin/main` using the branch naming rules above.
 4. Implement and verify the requested changes in that branch.
 5. Commit all task-related changes in that branch using the required commit-message prefix.
+6. Push the branch to `origin`.
+7. Open a pull request against `main` following the pull request rules above.
 
 Do not reuse an existing task branch or commit issue-related changes directly to `main` unless the user explicitly requests it.
