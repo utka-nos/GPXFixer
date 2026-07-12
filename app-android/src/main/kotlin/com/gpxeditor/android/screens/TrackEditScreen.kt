@@ -19,6 +19,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -28,6 +29,7 @@ import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.LatLngBounds
 import com.google.maps.android.compose.CameraPositionState
+import com.google.maps.android.compose.Circle
 import com.google.maps.android.compose.GoogleMap
 import com.google.maps.android.compose.MapUiSettings
 import com.google.maps.android.compose.Marker
@@ -38,7 +40,10 @@ import com.gpxeditor.shared.domain.activity.ActivityDocument
 import com.gpxeditor.shared.feature.edittrack.DeleteGpxTrackPointResult
 import com.gpxeditor.shared.feature.edittrack.MoveGpxTrackPointResult
 import com.gpxeditor.shared.feature.trackdetail.TrackDetail
+import kotlin.math.PI
+import kotlin.math.cos
 import kotlin.math.hypot
+import kotlin.math.pow
 
 @Composable
 fun TrackEditScreen(
@@ -397,6 +402,39 @@ private fun EditableTrackMap(
 ) {
     var mapLoaded by remember { mutableStateOf(false) }
     var didSetInitialCamera by remember { mutableStateOf(false) }
+    var visiblePointDots by remember(geometry) { mutableStateOf(emptyList<EditableTrackPoint>()) }
+    var pointDotRadiusMeters by remember(geometry) { mutableStateOf(0.0) }
+
+    LaunchedEffect(cameraPositionState, geometry, mapLoaded) {
+        if (!mapLoaded) return@LaunchedEffect
+
+        snapshotFlow { cameraPositionState.isMoving to cameraPositionState.position.zoom }
+            .collect { (isMoving, zoom) ->
+                if (isMoving) return@collect
+                if (zoom < EDIT_POINT_DOTS_MIN_ZOOM) {
+                    visiblePointDots = emptyList()
+                    pointDotRadiusMeters = 0.0
+                    return@collect
+                }
+
+                val visibleBounds = cameraPositionState.projection
+                    ?.visibleRegion
+                    ?.latLngBounds
+                    ?: return@collect
+                val candidates = geometry.points
+                    .asSequence()
+                    .filter { visibleBounds.contains(it.position) }
+                    .take(MAX_VISIBLE_EDIT_POINT_DOTS + 1)
+                    .toList()
+                visiblePointDots = candidates.takeIf {
+                    it.size <= MAX_VISIBLE_EDIT_POINT_DOTS
+                }.orEmpty()
+                pointDotRadiusMeters = EDIT_POINT_DOT_RADIUS_PX * metersPerPixel(
+                    latitude = cameraPositionState.position.target.latitude,
+                    zoom = zoom,
+                )
+            }
+    }
 
     LaunchedEffect(mapLoaded) {
         if (!mapLoaded || didSetInitialCamera) return@LaunchedEffect
@@ -447,6 +485,18 @@ private fun EditableTrackMap(
             )
         }
 
+        visiblePointDots.forEach { point ->
+            Circle(
+                center = point.position,
+                radius = pointDotRadiusMeters,
+                fillColor = Color(0xFF1565C0),
+                strokeColor = Color.White,
+                strokeWidth = 2f,
+                clickable = !isMovingPoint,
+                onClick = { onPointClick(point.index) },
+            )
+        }
+
         geometry.points.firstOrNull { it.index == selectedPointIndex }?.let { point ->
             Marker(
                 state = MarkerState(position = point.position),
@@ -461,6 +511,13 @@ private fun EditableTrackMap(
         }
     }
 }
+
+private const val EDIT_POINT_DOTS_MIN_ZOOM = 16f
+private const val MAX_VISIBLE_EDIT_POINT_DOTS = 50
+private const val EDIT_POINT_DOT_RADIUS_PX = 4.0
+
+private fun metersPerPixel(latitude: Double, zoom: Float): Double =
+    156_543.03392 * cos(latitude * PI / 180.0) / 2.0.pow(zoom.toDouble())
 
 private data class EditableTrackMapGeometry(
     val polylines: List<List<LatLng>>,
