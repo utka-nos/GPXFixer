@@ -52,7 +52,10 @@ fun TrackDetailScreen(
     }
 
     if (isPowerChartFullScreen) {
-        PowerChartFullScreen(
+        TrackChartFullScreen(
+            title = "Power",
+            unit = "W",
+            unitLong = "watts",
             samples = detail.powerSamples,
             onBackClick = { isPowerChartFullScreen = false },
         )
@@ -108,7 +111,9 @@ fun TrackDetailScreen(
             importedAt = detail.importedTrack.importedAt,
             summary = detail.summary,
         )
-        PowerChartSection(
+        TrackChartSection(
+            title = "Power",
+            unit = "W",
             samples = detail.powerSamples,
             onOpenChart = { isPowerChartFullScreen = true },
         )

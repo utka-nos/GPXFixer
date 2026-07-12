@@ -1,7 +1,7 @@
 package com.gpxeditor.shared.feature.trackdetail
 
-/** Inclusive visible range of elapsed time on the power chart. */
-data class PowerChartWindow(
+/** Inclusive visible range of elapsed time on a track chart. */
+data class TrackChartWindow(
     val startSeconds: Long,
     val endSeconds: Long,
 ) {
@@ -9,33 +9,33 @@ data class PowerChartWindow(
 }
 
 /** A labelled tick on the elapsed-time axis. */
-data class PowerChartTimeTick(
+data class TrackChartTimeTick(
     val elapsedSeconds: Long,
     val label: String,
 )
 
-/** A labelled tick on the power axis. */
-data class PowerChartPowerTick(
-    val powerWatts: Int,
+/** A labelled tick on the value axis. */
+data class TrackChartValueTick(
+    val value: Int,
     val label: String,
 )
 
 /**
- * Everything a platform chart needs to render one visible window of the power
+ * Everything a platform chart needs to render one visible window of a metric
  * series identically on Android and iOS: axis bounds, tick labels, the
  * range summary, and the gap-split, downsampled line segments.
  */
-data class PowerChartPresentation(
-    val window: PowerChartWindow,
-    val timeTicks: List<PowerChartTimeTick>,
-    val powerTicks: List<PowerChartPowerTick>,
-    val axisMaxWatts: Int,
-    val averagePowerWatts: Int?,
-    val maxPowerWatts: Int?,
-    val segments: List<List<PowerChartSample>>,
+data class TrackChartPresentation(
+    val window: TrackChartWindow,
+    val timeTicks: List<TrackChartTimeTick>,
+    val valueTicks: List<TrackChartValueTick>,
+    val axisMaxValue: Int,
+    val averageValue: Int?,
+    val maxValue: Int?,
+    val segments: List<List<TrackChartSample>>,
 )
 
-object PowerChartPresenter {
+object TrackChartPresenter {
     /** A timestamp gap larger than this breaks the line instead of bridging it. */
     const val GAP_THRESHOLD_SECONDS: Long = 60L
 
@@ -47,20 +47,20 @@ object PowerChartPresenter {
         60, 120, 300, 600, 900, 1_800,
         3_600, 7_200, 10_800, 21_600, 43_200,
     )
-    private val POWER_STEPS_WATTS = listOf(5, 10, 20, 25, 50, 100, 150, 200, 250, 500, 1_000)
+    private val VALUE_STEPS = listOf(5, 10, 20, 25, 50, 100, 150, 200, 250, 500, 1_000)
     private const val TARGET_TIME_TICKS = 6
-    private const val TARGET_POWER_TICKS = 5
+    private const val TARGET_VALUE_TICKS = 5
 
     /**
      * The window spanning the whole series, or null when there is not enough
      * data to draw a chart (fewer than two distinct timestamps).
      */
-    fun fullWindow(samples: List<PowerChartSample>): PowerChartWindow? {
+    fun fullWindow(samples: List<TrackChartSample>): TrackChartWindow? {
         val collapsed = collapseDuplicates(samples)
         if (collapsed.size < 2 || collapsed.first().elapsedSeconds == collapsed.last().elapsedSeconds) {
             return null
         }
-        return PowerChartWindow(collapsed.first().elapsedSeconds, collapsed.last().elapsedSeconds)
+        return TrackChartWindow(collapsed.first().elapsedSeconds, collapsed.last().elapsedSeconds)
     }
 
     /**
@@ -68,11 +68,11 @@ object PowerChartPresenter {
      * [focusSeconds] fixed, clamped to the full series and [MIN_WINDOW_SECONDS].
      */
     fun zoomed(
-        samples: List<PowerChartSample>,
-        window: PowerChartWindow,
+        samples: List<TrackChartSample>,
+        window: TrackChartWindow,
         factor: Double,
         focusSeconds: Long,
-    ): PowerChartWindow {
+    ): TrackChartWindow {
         val full = fullWindow(samples) ?: return window
         if (factor <= 0.0) return window
         val minDuration = minOf(MIN_WINDOW_SECONDS, full.durationSeconds)
@@ -88,10 +88,10 @@ object PowerChartPresenter {
 
     /** Shifts [window] by [deltaSeconds], clamped to the full series. */
     fun panned(
-        samples: List<PowerChartSample>,
-        window: PowerChartWindow,
+        samples: List<TrackChartSample>,
+        window: TrackChartWindow,
         deltaSeconds: Long,
-    ): PowerChartWindow {
+    ): TrackChartWindow {
         val full = fullWindow(samples) ?: return window
         return clampWindow(full, window.startSeconds + deltaSeconds, window.durationSeconds)
     }
@@ -103,30 +103,30 @@ object PowerChartPresenter {
      * computed from the original (non-downsampled) samples in the window.
      */
     fun presentation(
-        samples: List<PowerChartSample>,
-        window: PowerChartWindow,
+        samples: List<TrackChartSample>,
+        window: TrackChartWindow,
         maxRenderPoints: Int = 600,
-    ): PowerChartPresentation {
+    ): TrackChartPresentation {
         val collapsed = collapseDuplicates(samples)
         val visible = collapsed.filter {
             it.elapsedSeconds >= window.startSeconds && it.elapsedSeconds <= window.endSeconds
         }
-        val maxVisibleWatts = visible.maxOfOrNull { it.powerWatts }
-        val averageVisibleWatts = when {
+        val maxVisibleValue = visible.maxOfOrNull { it.value }
+        val averageVisibleValue = when {
             visible.isEmpty() -> null
-            else -> (visible.sumOf { it.powerWatts.toDouble() } / visible.size + 0.5).toInt()
+            else -> (visible.sumOf { it.value.toDouble() } / visible.size + 0.5).toInt()
         }
 
-        val powerAxis = powerAxis(maxVisibleWatts ?: 0)
+        val valueAxis = valueAxis(maxVisibleValue ?: 0)
         val renderSegments = renderSegments(collapsed, window, maxRenderPoints)
 
-        return PowerChartPresentation(
+        return TrackChartPresentation(
             window = window,
             timeTicks = timeTicks(window),
-            powerTicks = powerAxis.second,
-            axisMaxWatts = powerAxis.first,
-            averagePowerWatts = averageVisibleWatts,
-            maxPowerWatts = maxVisibleWatts,
+            valueTicks = valueAxis.second,
+            axisMaxValue = valueAxis.first,
+            averageValue = averageVisibleValue,
+            maxValue = maxVisibleValue,
             segments = renderSegments,
         )
     }
@@ -137,9 +137,9 @@ object PowerChartPresenter {
      * selected value matches the drawn line.
      */
     fun nearestSample(
-        samples: List<PowerChartSample>,
+        samples: List<TrackChartSample>,
         elapsedSeconds: Long,
-    ): PowerChartSample? {
+    ): TrackChartSample? {
         val collapsed = collapseDuplicates(samples)
         if (collapsed.isEmpty()) return null
         var low = 0
@@ -170,22 +170,22 @@ object PowerChartPresenter {
     }
 
     private fun clampWindow(
-        full: PowerChartWindow,
+        full: TrackChartWindow,
         proposedStart: Long,
         duration: Long,
-    ): PowerChartWindow {
+    ): TrackChartWindow {
         val clampedDuration = duration.coerceIn(
             minOf(MIN_WINDOW_SECONDS, full.durationSeconds),
             full.durationSeconds,
         )
         val start = proposedStart.coerceIn(full.startSeconds, full.endSeconds - clampedDuration)
-        return PowerChartWindow(start, start + clampedDuration)
+        return TrackChartWindow(start, start + clampedDuration)
     }
 
     /** Averages samples that share a timestamp so the line stays a function of time. */
-    private fun collapseDuplicates(samples: List<PowerChartSample>): List<PowerChartSample> {
+    private fun collapseDuplicates(samples: List<TrackChartSample>): List<TrackChartSample> {
         if (samples.isEmpty()) return emptyList()
-        val collapsed = ArrayList<PowerChartSample>(samples.size)
+        val collapsed = ArrayList<TrackChartSample>(samples.size)
         var index = 0
         while (index < samples.size) {
             val elapsed = samples[index].elapsedSeconds
@@ -197,19 +197,19 @@ object PowerChartPresenter {
                 samples[index].elapsedSeconds == elapsed &&
                 samples[index].segmentIndex == segmentIndex
             ) {
-                sum += samples[index].powerWatts
+                sum += samples[index].value
                 count++
                 index++
             }
-            collapsed.add(PowerChartSample(elapsed, (sum / count + 0.5).toInt(), segmentIndex))
+            collapsed.add(TrackChartSample(elapsed, (sum / count + 0.5).toInt(), segmentIndex))
         }
         return collapsed
     }
 
     /** Splits the series where consecutive samples are further apart than the gap threshold. */
-    private fun splitByGaps(samples: List<PowerChartSample>): List<List<PowerChartSample>> {
+    private fun splitByGaps(samples: List<TrackChartSample>): List<List<TrackChartSample>> {
         if (samples.isEmpty()) return emptyList()
-        val segments = mutableListOf<MutableList<PowerChartSample>>(mutableListOf(samples.first()))
+        val segments = mutableListOf<MutableList<TrackChartSample>>(mutableListOf(samples.first()))
         for (sampleIndex in 1 until samples.size) {
             val sample = samples[sampleIndex]
             val previous = samples[sampleIndex - 1]
@@ -225,10 +225,10 @@ object PowerChartPresenter {
     }
 
     private fun renderSegments(
-        collapsed: List<PowerChartSample>,
-        window: PowerChartWindow,
+        collapsed: List<TrackChartSample>,
+        window: TrackChartWindow,
         maxRenderPoints: Int,
-    ): List<List<PowerChartSample>> {
+    ): List<List<TrackChartSample>> {
         val windowed = splitByGaps(collapsed).mapNotNull { segment ->
             val firstVisible = segment.indexOfFirst { it.elapsedSeconds >= window.startSeconds }
             if (firstVisible == -1) return@mapNotNull null
@@ -263,7 +263,7 @@ object PowerChartPresenter {
      * Min-max downsampling: keeps the first and last sample and the extreme
      * values of each time bucket, so rendered peaks match the source data.
      */
-    private fun downsample(segment: List<PowerChartSample>, budget: Int): List<PowerChartSample> {
+    private fun downsample(segment: List<TrackChartSample>, budget: Int): List<TrackChartSample> {
         if (segment.size <= budget) return segment
         // First and last are always kept and each bucket contributes up to two
         // samples, so this bucket count keeps the result within the budget.
@@ -277,8 +277,8 @@ object PowerChartPresenter {
             var minIndex = bucketStart
             var maxIndex = bucketStart
             for (i in bucketStart until bucketEnd) {
-                if (interior[i].powerWatts < interior[minIndex].powerWatts) minIndex = i
-                if (interior[i].powerWatts > interior[maxIndex].powerWatts) maxIndex = i
+                if (interior[i].value < interior[minIndex].value) minIndex = i
+                if (interior[i].value > interior[maxIndex].value) maxIndex = i
             }
             keptIndices.add(minIndex + 1)
             keptIndices.add(maxIndex + 1)
@@ -287,21 +287,21 @@ object PowerChartPresenter {
         return keptIndices.sorted().map(segment::get)
     }
 
-    private fun timeTicks(window: PowerChartWindow): List<PowerChartTimeTick> {
+    private fun timeTicks(window: TrackChartWindow): List<TrackChartTimeTick> {
         val duration = window.durationSeconds.coerceAtLeast(1)
         val step = TIME_STEPS_SECONDS.firstOrNull { duration / it <= TARGET_TIME_TICKS }
             ?: TIME_STEPS_SECONDS.last()
         val firstTick = ((window.startSeconds + step - 1) / step) * step
-        val ticks = mutableListOf<PowerChartTimeTick>()
+        val ticks = mutableListOf<TrackChartTimeTick>()
         var tick = firstTick
         while (tick <= window.endSeconds) {
-            ticks.add(PowerChartTimeTick(tick, timeTickLabel(tick, window, step)))
+            ticks.add(TrackChartTimeTick(tick, timeTickLabel(tick, window, step)))
             tick += step
         }
         return ticks
     }
 
-    private fun timeTickLabel(elapsedSeconds: Long, window: PowerChartWindow, step: Long): String {
+    private fun timeTickLabel(elapsedSeconds: Long, window: TrackChartWindow, step: Long): String {
         val hours = elapsedSeconds / 3_600
         val minutes = (elapsedSeconds % 3_600) / 60
         val seconds = elapsedSeconds % 60
@@ -312,15 +312,15 @@ object PowerChartPresenter {
         }
     }
 
-    /** Returns the axis maximum and the tick list for a zero-based watt axis. */
-    private fun powerAxis(maxVisibleWatts: Int): Pair<Int, List<PowerChartPowerTick>> {
-        val effectiveMax = maxVisibleWatts.coerceAtLeast(1)
-        val rawStep = (effectiveMax + TARGET_POWER_TICKS - 1) / TARGET_POWER_TICKS
-        val step = POWER_STEPS_WATTS.firstOrNull { it >= rawStep } ?: POWER_STEPS_WATTS.last()
+    /** Returns the axis maximum and the tick list for a zero-based value axis. */
+    private fun valueAxis(maxVisibleValue: Int): Pair<Int, List<TrackChartValueTick>> {
+        val effectiveMax = maxVisibleValue.coerceAtLeast(1)
+        val rawStep = (effectiveMax + TARGET_VALUE_TICKS - 1) / TARGET_VALUE_TICKS
+        val step = VALUE_STEPS.firstOrNull { it >= rawStep } ?: VALUE_STEPS.last()
         // Pad the axis above the series maximum so the line never touches the top.
         val paddedMax = effectiveMax + (effectiveMax / 20).coerceAtLeast(1)
         val axisMax = ((paddedMax + step - 1) / step) * step
-        val ticks = (0..axisMax step step).map { PowerChartPowerTick(it, it.toString()) }
+        val ticks = (0..axisMax step step).map { TrackChartValueTick(it, it.toString()) }
         return axisMax to ticks
     }
 
