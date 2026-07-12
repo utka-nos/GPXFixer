@@ -20,9 +20,11 @@ final class RecordingSession: NSObject, ObservableObject, CLLocationManagerDeleg
     @Published private(set) var authorizationDenied = false
     @Published private(set) var recoveredRecording: RecordedActivity?
     @Published private(set) var powerSensorStatus = PowerSensorRecordingStatus.notConfigured
+    @Published private(set) var heartRateSensorStatus = HeartRateSensorRecordingStatus.notConfigured
 
     private let facade = IosRecordingFacade()
     private let powerSensorFacade = IosPowerSensorFacade()
+    private let heartRateSensorFacade = IosHeartRateSensorFacade()
     private let manager = CLLocationManager()
     private let journalQueue = DispatchQueue(label: "com.gpxeditor.recording.journal")
     private var recorder: TrackRecorder?
@@ -67,7 +69,8 @@ final class RecordingSession: NSObject, ObservableObject, CLLocationManagerDeleg
             config: TrackRecorderConfig(
                 sport: "cycling",
                 maxHorizontalAccuracyMeters: 50.0,
-                powerSampleTimeoutMillis: 5_000
+                powerSampleTimeoutMillis: 5_000,
+                heartRateSampleTimeoutMillis: 5_000
             )
         )
         recorder = startedRecorder
@@ -87,6 +90,13 @@ final class RecordingSession: NSObject, ObservableObject, CLLocationManagerDeleg
             self.publishStats()
         }, onStatus: { [weak self] status in
             self?.powerSensorStatus = status
+        })
+        heartRateSensorFacade.connectSaved(onSample: { [weak self] sample in
+            guard let self, let recorder = self.recorder else { return }
+            recorder.onHeartRate(sample: sample, atEpochMillis: self.nowMillis())
+            self.publishStats()
+        }, onStatus: { [weak self] status in
+            self?.heartRateSensorStatus = status
         })
         startTicker()
         publishStats()
@@ -128,6 +138,8 @@ final class RecordingSession: NSObject, ObservableObject, CLLocationManagerDeleg
         manager.allowsBackgroundLocationUpdates = false
         powerSensorFacade.disconnect()
         powerSensorStatus = .notConnected
+        heartRateSensorFacade.disconnect()
+        heartRateSensorStatus = .notConnected
 
         journalQueue.async {
             let message = self.saveClearingJournal(recorded.document)

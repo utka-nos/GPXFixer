@@ -6,8 +6,8 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.core.content.ContextCompat
 
-/** Runtime permissions needed to scan for and connect to a BLE power sensor. */
-object PowerSensorPermissions {
+/** Runtime permissions needed to scan for and connect to a BLE sensor. */
+object BleSensorPermissions {
     fun required(): Array<String> = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
         arrayOf(
             Manifest.permission.BLUETOOTH_SCAN,

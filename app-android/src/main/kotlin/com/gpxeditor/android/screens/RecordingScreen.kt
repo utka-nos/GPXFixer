@@ -32,6 +32,7 @@ import com.gpxeditor.android.recording.TrackRecordingService
 import com.gpxeditor.shared.feature.recordtrack.RecordingState
 import com.gpxeditor.shared.feature.recordtrack.RecordingStats
 import com.gpxeditor.shared.feature.recordtrack.RoutePoint
+import com.gpxeditor.shared.data.ble.HeartRateSensorRecordingStatus
 import com.gpxeditor.shared.data.ble.PowerSensorRecordingStatus
 
 @Composable
@@ -40,6 +41,7 @@ fun RecordingScreen(onBackClick: () -> Unit) {
     val stats by TrackRecordingService.stats.collectAsState()
     val routeSegments by TrackRecordingService.routeSegments.collectAsState()
     val powerSensorStatus by TrackRecordingService.powerSensorStatus.collectAsState()
+    val heartRateSensorStatus by TrackRecordingService.heartRateSensorStatus.collectAsState()
     var permissionsGranted by remember { mutableStateOf(RecordingPermissions.allGranted(context)) }
     var showStopConfirmation by remember { mutableStateOf(false) }
 
@@ -111,6 +113,7 @@ fun RecordingScreen(onBackClick: () -> Unit) {
                 stats = currentStats,
                 routeSegments = routeSegments,
                 powerSensorStatus = powerSensorStatus,
+                heartRateSensorStatus = heartRateSensorStatus,
                 onPauseClick = { TrackRecordingService.pause(context) },
                 onResumeClick = { TrackRecordingService.resume(context) },
                 onStopClick = { showStopConfirmation = true },
@@ -165,6 +168,7 @@ private fun ActiveRecordingContent(
     stats: RecordingStats,
     routeSegments: List<List<RoutePoint>>,
     powerSensorStatus: PowerSensorRecordingStatus,
+    heartRateSensorStatus: HeartRateSensorRecordingStatus,
     onPauseClick: () -> Unit,
     onResumeClick: () -> Unit,
     onStopClick: () -> Unit,
@@ -186,6 +190,7 @@ private fun ActiveRecordingContent(
     StatRow(label = "Points", value = stats.pointCount.toString())
     StatRow(label = "Power", value = stats.currentPowerWatts?.let { "$it W" } ?: "—")
     StatRow(label = "Cadence", value = stats.currentCadenceRpm?.let { "$it rpm" } ?: "—")
+    StatRow(label = "Heart rate", value = stats.currentHeartRateBpm?.let { "$it bpm" } ?: "—")
     Text(
         text = when (powerSensorStatus) {
             PowerSensorRecordingStatus.CONNECTED -> "Power sensor connected"
@@ -194,6 +199,20 @@ private fun ActiveRecordingContent(
             PowerSensorRecordingStatus.NOT_CONFIGURED -> "No power sensor configured"
         },
         color = if (powerSensorStatus == PowerSensorRecordingStatus.CONNECTED) {
+            MaterialTheme.colorScheme.primary
+        } else {
+            MaterialTheme.colorScheme.secondary
+        },
+        style = MaterialTheme.typography.bodyMedium,
+    )
+    Text(
+        text = when (heartRateSensorStatus) {
+            HeartRateSensorRecordingStatus.CONNECTED -> "Heart rate sensor connected"
+            HeartRateSensorRecordingStatus.RECONNECTING -> "Heart rate sensor reconnecting…"
+            HeartRateSensorRecordingStatus.NOT_CONNECTED -> "Heart rate sensor not connected"
+            HeartRateSensorRecordingStatus.NOT_CONFIGURED -> "No heart rate sensor configured"
+        },
+        color = if (heartRateSensorStatus == HeartRateSensorRecordingStatus.CONNECTED) {
             MaterialTheme.colorScheme.primary
         } else {
             MaterialTheme.colorScheme.secondary

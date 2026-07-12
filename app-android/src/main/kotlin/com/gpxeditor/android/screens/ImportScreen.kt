@@ -23,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.gpxeditor.android.ImportScreenState
+import com.gpxeditor.android.recording.HeartRateSensorController
 import com.gpxeditor.android.recording.PowerSensorController
 import com.gpxeditor.shared.domain.activity.ActivityDocument
 import com.gpxeditor.shared.domain.imported.ImportedTrack
@@ -53,6 +54,7 @@ fun ImportScreen(
     onRestoreRecording: () -> Unit,
     onDiscardRecording: () -> Unit,
     powerSensorController: PowerSensorController,
+    heartRateSensorController: HeartRateSensorController,
 ) {
     var trackPendingDelete by remember { mutableStateOf<ImportedTrack?>(null) }
     var isRecordingOpen by remember { mutableStateOf(false) }
@@ -71,8 +73,9 @@ fun ImportScreen(
             }
 
             if (isSensorsOpen) {
-                PowerSensorScreen(
-                    controller = powerSensorController,
+                SensorsScreen(
+                    powerSensorController = powerSensorController,
+                    heartRateSensorController = heartRateSensorController,
                     onBackClick = { isSensorsOpen = false },
                 )
                 return@Surface

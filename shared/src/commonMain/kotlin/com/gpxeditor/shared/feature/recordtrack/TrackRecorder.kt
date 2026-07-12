@@ -7,6 +7,7 @@ import com.gpxeditor.shared.domain.activity.ActivityMetadata
 import com.gpxeditor.shared.domain.activity.ActivityPoint
 import com.gpxeditor.shared.domain.activity.ActivitySegment
 import com.gpxeditor.shared.domain.activity.ActivityTrack
+import com.gpxeditor.shared.data.ble.HeartRateSample
 import com.gpxeditor.shared.data.ble.PowerSample
 import kotlin.math.roundToInt
 
@@ -32,6 +33,7 @@ class TrackRecorder(
     private var activeSpanStartMillis: Long? = null
     private var pointCount = 0
     private var latestPower: TimedPowerSample? = null
+    private var latestHeartRate: TimedHeartRateSample? = null
 
     fun start(atEpochMillis: Long) {
         check(state == RecordingState.IDLE) { "Recording can only be started from the idle state." }
@@ -90,7 +92,10 @@ class TrackRecorder(
             currentSpeedMetersPerSecond = sample.speedMetersPerSecond
         }
 
-        segments.last() += sample.toActivityPoint(powerAt(sample.epochMillis))
+        segments.last() += sample.toActivityPoint(
+            power = powerAt(sample.epochMillis),
+            heartRate = heartRateAt(sample.epochMillis),
+        )
         lastAcceptedSample = sample
         pointCount += 1
         return true
@@ -98,6 +103,10 @@ class TrackRecorder(
 
     fun onPower(sample: PowerSample, atEpochMillis: Long) {
         latestPower = TimedPowerSample(sample, atEpochMillis)
+    }
+
+    fun onHeartRate(sample: HeartRateSample, atEpochMillis: Long) {
+        latestHeartRate = TimedHeartRateSample(sample, atEpochMillis)
     }
 
     /**
@@ -142,6 +151,7 @@ class TrackRecorder(
             pointCount = pointCount,
             currentPowerWatts = powerAt(nowEpochMillis)?.watts,
             currentCadenceRpm = powerAt(nowEpochMillis)?.cadenceRpm?.roundToInt(),
+            currentHeartRateBpm = heartRateAt(nowEpochMillis)?.bpm,
         )
     }
 
@@ -164,13 +174,20 @@ class TrackRecorder(
         return timed.sample.takeIf { ageMillis in 0..config.powerSampleTimeoutMillis }
     }
 
-    private fun LocationSample.toActivityPoint(power: PowerSample?): ActivityPoint {
+    private fun heartRateAt(epochMillis: Long): HeartRateSample? {
+        val timed = latestHeartRate ?: return null
+        val ageMillis = epochMillis - timed.epochMillis
+        return timed.sample.takeIf { ageMillis in 0..config.heartRateSampleTimeoutMillis }
+    }
+
+    private fun LocationSample.toActivityPoint(power: PowerSample?, heartRate: HeartRateSample?): ActivityPoint {
         return ActivityPoint(
             time = unixSecondsToIso(epochMillis.floorDiv(1000L)),
             latitude = latitude,
             longitude = longitude,
             elevationMeters = elevationMeters,
             speedMetersPerSecond = speedMetersPerSecond,
+            heartRateBpm = heartRate?.bpm,
             powerWatts = power?.watts,
             cadenceRpm = power?.cadenceRpm?.roundToInt(),
         )
@@ -201,6 +218,7 @@ data class TrackRecorderConfig(
     val sport: String = "cycling",
     val maxHorizontalAccuracyMeters: Double = 50.0,
     val powerSampleTimeoutMillis: Long = 5_000L,
+    val heartRateSampleTimeoutMillis: Long = 5_000L,
 )
 
 enum class RecordingState {
@@ -223,9 +241,12 @@ data class RecordingStats(
     val pointCount: Int,
     val currentPowerWatts: Int?,
     val currentCadenceRpm: Int?,
+    val currentHeartRateBpm: Int?,
 )
 
 private data class TimedPowerSample(val sample: PowerSample, val epochMillis: Long)
+
+private data class TimedHeartRateSample(val sample: HeartRateSample, val epochMillis: Long)
 
 data class RecordedActivity(
     val document: ActivityDocument,

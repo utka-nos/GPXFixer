@@ -1,5 +1,6 @@
 package com.gpxeditor.shared.feature.recordtrack
 
+import com.gpxeditor.shared.data.ble.HeartRateSample
 import com.gpxeditor.shared.data.ble.PowerSample
 
 import kotlin.test.Test
@@ -210,6 +211,59 @@ class TrackRecorderTest {
         val points = recorder.stop(T0 + 7_000).document.tracks.single().segments.single().points
         assertEquals(listOf(210, null, 260), points.map { it.powerWatts })
         assertEquals(listOf(82, null, 90), points.map { it.cadenceRpm })
+    }
+
+    @Test
+    fun mergesLatestHeartRateIntoRecordedLocationsAndStats() {
+        val recorder = TrackRecorder()
+        recorder.start(atEpochMillis = T0)
+        recorder.onHeartRate(HeartRateSample(bpm = 156), atEpochMillis = T0 + 900)
+
+        recorder.onLocation(sample(secondsAfterStart = 1, latitude = 55.0))
+
+        assertEquals(156, recorder.stats(T0 + 1_100).currentHeartRateBpm)
+        val point = recorder.stop(T0 + 2_000).document.tracks.single().segments.single().points.single()
+        assertEquals(156, point.heartRateBpm)
+    }
+
+    @Test
+    fun doesNotMergeStaleOrFutureHeartRateSamples() {
+        val recorder = TrackRecorder(TrackRecorderConfig(heartRateSampleTimeoutMillis = 4_000))
+        recorder.start(atEpochMillis = T0)
+        recorder.onHeartRate(HeartRateSample(bpm = 140), atEpochMillis = T0 + 1_000)
+
+        recorder.onLocation(sample(secondsAfterStart = 5, latitude = 55.0))
+        recorder.onLocation(sample(secondsAfterStart = 6, latitude = 55.001))
+
+        val points = recorder.stop(T0 + 7_000).document.tracks.single().segments.single().points
+        assertEquals(140, points[0].heartRateBpm)
+        assertNull(points[1].heartRateBpm)
+        assertNull(recorder.stats(T0 + 7_000).currentHeartRateBpm)
+
+        val futureRecorder = TrackRecorder()
+        futureRecorder.start(T0)
+        futureRecorder.onHeartRate(HeartRateSample(170), T0 + 2_000)
+        futureRecorder.onLocation(sample(secondsAfterStart = 1, latitude = 55.0))
+        val futurePoint = futureRecorder.stop(T0 + 3_000).document.tracks.single().segments.single().points.single()
+        assertNull(futurePoint.heartRateBpm)
+    }
+
+    @Test
+    fun leavesHeartRateGapDuringDisconnectAndResumesWithFreshSample() {
+        val recorder = TrackRecorder(TrackRecorderConfig(heartRateSampleTimeoutMillis = 3_000))
+        recorder.start(T0)
+        recorder.onHeartRate(HeartRateSample(130), T0 + 500)
+        recorder.onLocation(sample(secondsAfterStart = 1, latitude = 55.0))
+
+        // No heart rate notifications while disconnected: the old sample must expire.
+        recorder.onLocation(sample(secondsAfterStart = 5, latitude = 55.001))
+
+        // A notification after reconnect is merged normally again.
+        recorder.onHeartRate(HeartRateSample(148), T0 + 5_500)
+        recorder.onLocation(sample(secondsAfterStart = 6, latitude = 55.002))
+
+        val points = recorder.stop(T0 + 7_000).document.tracks.single().segments.single().points
+        assertEquals(listOf(130, null, 148), points.map { it.heartRateBpm })
     }
 
     @Test
