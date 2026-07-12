@@ -313,7 +313,9 @@ private struct EditableTrackMap: UIViewRepresentable {
         context.coordinator.points = geometry.points
 
         mapView.removeOverlays(mapView.overlays)
-        mapView.removeAnnotations(mapView.annotations)
+        mapView.removeAnnotations(
+            mapView.annotations.filter { $0 is EditableTrackPointAnnotation }
+        )
 
         let overlays = geometry.polylines.map { coordinates in
             MKPolyline(coordinates: coordinates, count: coordinates.count)
@@ -337,14 +339,21 @@ private struct EditableTrackMap: UIViewRepresentable {
             )
             context.coordinator.didSetInitialVisibleMapRect = true
         }
+        context.coordinator.syncPointDotAnnotations(on: mapView)
     }
 
     final class Coordinator: NSObject, MKMapViewDelegate {
+        private static let pointDotsMinZoom: Double = 16
+        private static let maxVisiblePointDots = 50
+        private static let pointDotDiameter: CGFloat = 8
+        private static let pointDotReuseIdentifier = "editable-track-point-dot"
+
         var selectedPointIndex: Binding<Int?>
         var isMovingPoint: Bool
         var onMapTap: (CLLocationCoordinate2D) -> Void
         var points: [EditableTrackPoint] = []
         var didSetInitialVisibleMapRect = false
+        private var pointDotAnnotations: [EditableTrackPointDotAnnotation] = []
 
         init(
             selectedPointIndex: Binding<Int?>,
@@ -403,7 +412,33 @@ private struct EditableTrackMap: UIViewRepresentable {
             return renderer
         }
 
+        func mapView(_ mapView: MKMapView, regionDidChangeAnimated animated: Bool) {
+            syncPointDotAnnotations(on: mapView)
+        }
+
         func mapView(_ mapView: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
+            if let annotation = annotation as? EditableTrackPointDotAnnotation {
+                let view = mapView.dequeueReusableAnnotationView(
+                    withIdentifier: Self.pointDotReuseIdentifier
+                ) ?? MKAnnotationView(
+                    annotation: annotation,
+                    reuseIdentifier: Self.pointDotReuseIdentifier
+                )
+                view.annotation = annotation
+                view.bounds = CGRect(
+                    x: 0,
+                    y: 0,
+                    width: Self.pointDotDiameter,
+                    height: Self.pointDotDiameter
+                )
+                view.layer.cornerRadius = Self.pointDotDiameter / 2
+                view.backgroundColor = .systemBlue
+                view.layer.borderColor = UIColor.white.cgColor
+                view.layer.borderWidth = 1.5
+                view.displayPriority = .required
+                return view
+            }
+
             guard let annotation = annotation as? EditableTrackPointAnnotation else {
                 return nil
             }
@@ -429,12 +464,57 @@ private struct EditableTrackMap: UIViewRepresentable {
         func mapView(_ mapView: MKMapView, didSelect view: MKAnnotationView) {
             guard !isMovingPoint else { return }
 
-            guard let annotation = view.annotation as? EditableTrackPointAnnotation else {
+            guard let annotation = view.annotation as? EditableTrackPointIdentifying else {
                 return
             }
 
             selectedPointIndex.wrappedValue = annotation.pointIndex
             mapView.deselectAnnotation(annotation, animated: false)
+        }
+
+        func syncPointDotAnnotations(on mapView: MKMapView) {
+            let visiblePoints = visiblePointsForDots(on: mapView)
+            let unchanged = visiblePoints.count == pointDotAnnotations.count
+                && zip(visiblePoints, pointDotAnnotations).allSatisfy { point, annotation in
+                    point.index == annotation.pointIndex
+                        && point.coordinate.latitude == annotation.coordinate.latitude
+                        && point.coordinate.longitude == annotation.coordinate.longitude
+                }
+            guard !unchanged else { return }
+
+            mapView.removeAnnotations(pointDotAnnotations)
+            pointDotAnnotations = visiblePoints.map {
+                EditableTrackPointDotAnnotation(
+                    pointIndex: $0.index,
+                    coordinate: $0.coordinate
+                )
+            }
+            mapView.addAnnotations(pointDotAnnotations)
+        }
+
+        private func visiblePointsForDots(on mapView: MKMapView) -> [EditableTrackPoint] {
+            guard !isMovingPoint, zoomLevel(of: mapView) >= Self.pointDotsMinZoom else {
+                return []
+            }
+
+            let selectedPointIndex = selectedPointIndex.wrappedValue
+            let visibleRect = mapView.visibleMapRect
+            let candidates = points.lazy
+                .filter { $0.index != selectedPointIndex }
+                .filter { visibleRect.contains(MKMapPoint($0.coordinate)) }
+                .prefix(Self.maxVisiblePointDots + 1)
+            guard candidates.count <= Self.maxVisiblePointDots else {
+                return []
+            }
+            return Array(candidates)
+        }
+
+        private func zoomLevel(of mapView: MKMapView) -> Double {
+            let width = mapView.bounds.width
+            guard width > 0, mapView.region.span.longitudeDelta > 0 else {
+                return 0
+            }
+            return log2(360 * (width / 256) / mapView.region.span.longitudeDelta)
         }
     }
 }
@@ -448,7 +528,11 @@ extension EditableTrackMap.Coordinator: UIGestureRecognizerDelegate {
     }
 }
 
-private final class EditableTrackPointAnnotation: NSObject, MKAnnotation {
+private protocol EditableTrackPointIdentifying: MKAnnotation {
+    var pointIndex: Int { get }
+}
+
+private final class EditableTrackPointAnnotation: NSObject, EditableTrackPointIdentifying {
     let pointIndex: Int
     let coordinate: CLLocationCoordinate2D
 
@@ -456,6 +540,16 @@ private final class EditableTrackPointAnnotation: NSObject, MKAnnotation {
         pointIndex: Int,
         coordinate: CLLocationCoordinate2D
     ) {
+        self.pointIndex = pointIndex
+        self.coordinate = coordinate
+    }
+}
+
+private final class EditableTrackPointDotAnnotation: NSObject, EditableTrackPointIdentifying {
+    let pointIndex: Int
+    let coordinate: CLLocationCoordinate2D
+
+    init(pointIndex: Int, coordinate: CLLocationCoordinate2D) {
         self.pointIndex = pointIndex
         self.coordinate = coordinate
     }
