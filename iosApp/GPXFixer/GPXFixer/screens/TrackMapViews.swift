@@ -114,7 +114,6 @@ struct LiveRecordingMapView: UIViewRepresentable {
     func updateUIView(_ mapView: MKMapView, context: Context) {
         mapView.removeOverlays(mapView.overlays)
         let overlays = segments
-            .map { $0.decimatedForDisplay() }
             .filter { !$0.isEmpty }
             .map { MKPolyline(coordinates: $0, count: $0.count) }
         mapView.addOverlays(overlays)
@@ -158,23 +157,6 @@ struct LiveRecordingMapView: UIViewRepresentable {
             renderer.lineCap = .round
             return renderer
         }
-    }
-}
-
-extension [CLLocationCoordinate2D] {
-    /// Caps the number of rendered points per segment so redrawing the
-    /// polyline stays cheap on multi-hour recordings. Keeps every stride-th
-    /// point plus the last one, which is enough fidelity for a small live map.
-    fileprivate func decimatedForDisplay(maxPoints: Int = 1_000) -> [CLLocationCoordinate2D] {
-        guard count > maxPoints else { return self }
-
-        let stride = (count + maxPoints - 1) / maxPoints
-        var result = Swift.stride(from: 0, to: count, by: stride).map { self[$0] }
-        if let lastKept = result.last, let last = last,
-           lastKept.latitude != last.latitude || lastKept.longitude != last.longitude {
-            result.append(last)
-        }
-        return result
     }
 }
 

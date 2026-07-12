@@ -43,7 +43,7 @@ fun LiveRecordingMap(
 ) {
     val polylines = remember(segments) {
         segments.map { segment ->
-            decimateForDisplay(segment).map { LatLng(it.latitude, it.longitude) }
+            segment.map { LatLng(it.latitude, it.longitude) }
         }
     }
     val currentPosition = polylines.lastOrNull()?.lastOrNull()
@@ -92,30 +92,7 @@ fun LiveRecordingMap(
     }
 }
 
-/**
- * Caps the number of rendered points per segment so redrawing the polyline
- * stays cheap on multi-hour recordings. Keeps every stride-th point plus the
- * last one, which is enough fidelity for a small live map.
- */
-private fun decimateForDisplay(
-    points: List<RoutePoint>,
-    maxPoints: Int = MAX_DISPLAY_POINTS_PER_SEGMENT,
-): List<RoutePoint> {
-    if (points.size <= maxPoints) return points
-
-    val stride = (points.size + maxPoints - 1) / maxPoints
-    val result = ArrayList<RoutePoint>(maxPoints + 1)
-    for (index in points.indices step stride) {
-        result += points[index]
-    }
-    if (result.last() != points.last()) {
-        result += points.last()
-    }
-    return result
-}
-
 private const val LIVE_MAP_ZOOM = 16f
-private const val MAX_DISPLAY_POINTS_PER_SEGMENT = 1_000
 
 @Composable
 fun TrackMapSection(
