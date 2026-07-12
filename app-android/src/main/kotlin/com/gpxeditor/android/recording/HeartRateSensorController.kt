@@ -29,6 +29,7 @@ class HeartRateSensorController(
     private val mutableState = MutableStateFlow(HeartRateSensorScreenState(selected = settings.load()))
     val state: StateFlow<HeartRateSensorScreenState> = mutableState.asStateFlow()
     private var scanJob: Job? = null
+    private var selectionJob: Job? = null
 
     init {
         scope.launch {
@@ -74,26 +75,43 @@ class HeartRateSensorController(
 
     fun closeScreen() {
         stopScan()
-        scope.launch { sensor.disconnect() }
+        val activeSelection = selectionJob
+        selectionJob = null
+        activeSelection?.cancel()
+        scope.launch {
+            activeSelection?.join()
+            sensor.disconnect()
+        }
     }
 
     fun select(device: HeartRateSensorDevice) {
+        if (selectionJob != null) return
         stopScan()
-        scope.launch {
-            sensor.disconnect()
-            sensor.connect(device.id)
-            if (sensor.connectionState.value is HeartRateSensorConnectionState.Connected) {
-                val selected = SelectedHeartRateSensor(device.id, device.name)
-                settings.save(selected)
-                mutableState.value = mutableState.value.copy(selected = selected, errorMessage = null)
+        selectionJob = scope.launch {
+            try {
+                sensor.disconnect()
+                sensor.connect(device.id)
+                if (sensor.connectionState.value is HeartRateSensorConnectionState.Connected) {
+                    val selected = SelectedHeartRateSensor(device.id, device.name)
+                    settings.save(selected)
+                    mutableState.value = mutableState.value.copy(selected = selected, errorMessage = null)
+                }
+            } finally {
+                selectionJob = null
             }
         }
     }
 
     fun forget() {
         stopScan()
+        val activeSelection = selectionJob
+        selectionJob = null
+        activeSelection?.cancel()
         settings.save(null)
         mutableState.value = mutableState.value.copy(selected = null, devices = emptyList())
-        scope.launch { sensor.disconnect() }
+        scope.launch {
+            activeSelection?.join()
+            sensor.disconnect()
+        }
     }
 }
