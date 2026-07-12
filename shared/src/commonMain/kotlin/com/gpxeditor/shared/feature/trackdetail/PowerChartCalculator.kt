@@ -25,9 +25,10 @@ object PowerChartCalculator {
                 val unixSeconds = point.time?.let(::isoToUnixSeconds) ?: return@mapNotNull null
                 unixSeconds to power
             }
+            .sortedBy { it.first }
         if (timedPowers.size < 2) return emptyList()
 
-        val startSeconds = timedPowers.minOf { it.first }
+        val startSeconds = timedPowers.first().first
         return timedPowers.map { (unixSeconds, power) ->
             PowerChartSample(
                 elapsedSeconds = unixSeconds - startSeconds,
