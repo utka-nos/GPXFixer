@@ -91,6 +91,93 @@ private struct TrackMapPreview: UIViewRepresentable {
     }
 }
 
+/// Map for the recording screen: draws the route recorded so far (one polyline
+/// per pause/resume segment) and keeps the camera on the latest position. The
+/// camera only moves when a new point arrives, so it stays still while paused.
+struct LiveRecordingMapView: UIViewRepresentable {
+    let segments: [[CLLocationCoordinate2D]]
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
+    func makeUIView(context: Context) -> MKMapView {
+        let mapView = MKMapView()
+        mapView.delegate = context.coordinator
+        mapView.isUserInteractionEnabled = false
+        mapView.pointOfInterestFilter = .excludingAll
+        mapView.showsCompass = false
+        mapView.showsScale = false
+        return mapView
+    }
+
+    func updateUIView(_ mapView: MKMapView, context: Context) {
+        mapView.removeOverlays(mapView.overlays)
+        let overlays = segments
+            .map { $0.decimatedForDisplay() }
+            .filter { !$0.isEmpty }
+            .map { MKPolyline(coordinates: $0, count: $0.count) }
+        mapView.addOverlays(overlays)
+
+        guard let currentPosition = segments.last?.last else { return }
+
+        let coordinator = context.coordinator
+        if let previous = coordinator.followedPosition,
+           previous.latitude == currentPosition.latitude,
+           previous.longitude == currentPosition.longitude {
+            return
+        }
+
+        if coordinator.followedPosition == nil {
+            mapView.setRegion(
+                MKCoordinateRegion(
+                    center: currentPosition,
+                    latitudinalMeters: 1_000,
+                    longitudinalMeters: 1_000
+                ),
+                animated: false
+            )
+        } else {
+            mapView.setCenter(currentPosition, animated: true)
+        }
+        coordinator.followedPosition = currentPosition
+    }
+
+    final class Coordinator: NSObject, MKMapViewDelegate {
+        var followedPosition: CLLocationCoordinate2D?
+
+        func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
+            guard let polyline = overlay as? MKPolyline else {
+                return MKOverlayRenderer(overlay: overlay)
+            }
+
+            let renderer = MKPolylineRenderer(polyline: polyline)
+            renderer.strokeColor = UIColor.systemBlue
+            renderer.lineWidth = 4
+            renderer.lineJoin = .round
+            renderer.lineCap = .round
+            return renderer
+        }
+    }
+}
+
+extension [CLLocationCoordinate2D] {
+    /// Caps the number of rendered points per segment so redrawing the
+    /// polyline stays cheap on multi-hour recordings. Keeps every stride-th
+    /// point plus the last one, which is enough fidelity for a small live map.
+    fileprivate func decimatedForDisplay(maxPoints: Int = 1_000) -> [CLLocationCoordinate2D] {
+        guard count > maxPoints else { return self }
+
+        let stride = (count + maxPoints - 1) / maxPoints
+        var result = Swift.stride(from: 0, to: count, by: stride).map { self[$0] }
+        if let lastKept = result.last, let last = last,
+           lastKept.latitude != last.latitude || lastKept.longitude != last.longitude {
+            result.append(last)
+        }
+        return result
+    }
+}
+
 private struct TrackMapGeometry {
     let polylines: [[CLLocationCoordinate2D]]
     let visibleMapRect: MKMapRect

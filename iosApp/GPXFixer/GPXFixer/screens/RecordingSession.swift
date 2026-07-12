@@ -10,6 +10,12 @@ final class RecordingSession: NSObject, ObservableObject, CLLocationManagerDeleg
     static let shared = RecordingSession()
 
     @Published private(set) var stats: RecordingStats?
+
+    /// Route of the active recording as coordinate segments, one per
+    /// pause/resume span. Updated whenever a location becomes a track point;
+    /// empty when nothing is being recorded or there is no GPS fix yet.
+    @Published private(set) var routeSegments: [[CLLocationCoordinate2D]] = []
+
     @Published private(set) var lastSaveMessage: String?
     @Published private(set) var authorizationDenied = false
     @Published private(set) var recoveredRecording: RecordedActivity?
@@ -54,6 +60,7 @@ final class RecordingSession: NSObject, ObservableObject, CLLocationManagerDeleg
 
         authorizationDenied = false
         lastSaveMessage = nil
+        routeSegments = []
 
         let startedAt = nowMillis()
         let startedRecorder = TrackRecorder(
@@ -115,6 +122,7 @@ final class RecordingSession: NSObject, ObservableObject, CLLocationManagerDeleg
 
         let recorded = recorder.stop(atEpochMillis: nowMillis(), name: nil)
         stats = nil
+        routeSegments = []
         stopTicker()
         manager.stopUpdatingLocation()
         manager.allowsBackgroundLocationUpdates = false
@@ -209,6 +217,7 @@ final class RecordingSession: NSObject, ObservableObject, CLLocationManagerDeleg
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard let recorder else { return }
 
+        var routeChanged = false
         for location in locations {
             let sample = LocationSample(
                 epochMillis: Int64(location.timestamp.timeIntervalSince1970 * 1_000),
@@ -226,8 +235,17 @@ final class RecordingSession: NSObject, ObservableObject, CLLocationManagerDeleg
             )
 
             if recorder.onLocation(sample: sample) {
+                routeChanged = true
                 journalQueue.async {
                     self.appendJournalLine(RecordingJournal.shared.pointLine(sample: sample))
+                }
+            }
+        }
+
+        if routeChanged {
+            routeSegments = recorder.routeSegments().map { segment in
+                segment.map { point in
+                    CLLocationCoordinate2D(latitude: point.latitude, longitude: point.longitude)
                 }
             }
         }

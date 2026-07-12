@@ -56,6 +56,13 @@ struct IOSRecordingScreen: View {
     private func activeSection(stats: RecordingStats) -> some View {
         Group {
             Section {
+                LiveRecordingMapView(segments: session.routeSegments)
+                    .frame(height: 240)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
+            }
+
+            Section {
                 Text(formatDuration(stats.elapsedMillis))
                     .font(.system(size: 52, weight: .semibold, design: .rounded))
                     .monospacedDigit()
