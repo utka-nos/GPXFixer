@@ -100,6 +100,23 @@ class TrackRecorder(
         latestPower = TimedPowerSample(sample, atEpochMillis)
     }
 
+    /**
+     * Snapshot of the recorded route as coordinate segments. Each pause/resume
+     * cycle produces a separate segment so the UI can draw them as disjoint
+     * polylines instead of connecting them across the gap.
+     */
+    fun routeSegments(): List<List<RoutePoint>> {
+        return segments
+            .filter { it.isNotEmpty() }
+            .map { segment ->
+                segment.mapNotNull { point ->
+                    val latitude = point.latitude ?: return@mapNotNull null
+                    val longitude = point.longitude ?: return@mapNotNull null
+                    RoutePoint(latitude, longitude)
+                }
+            }
+    }
+
     fun stats(nowEpochMillis: Long): RecordingStats {
         val runningSpanMillis = activeSpanStartMillis
             ?.let { (nowEpochMillis - it).coerceAtLeast(0L) }
@@ -180,6 +197,11 @@ enum class RecordingState {
     PAUSED,
     STOPPED,
 }
+
+data class RoutePoint(
+    val latitude: Double,
+    val longitude: Double,
+)
 
 data class RecordingStats(
     val state: RecordingState,
