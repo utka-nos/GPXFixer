@@ -56,5 +56,7 @@ dependencies {
     implementation(libs.google.maps.compose)
     implementation(libs.play.services.location)
 
+    testImplementation(kotlin("test"))
+
     debugImplementation(compose.uiTooling)
 }

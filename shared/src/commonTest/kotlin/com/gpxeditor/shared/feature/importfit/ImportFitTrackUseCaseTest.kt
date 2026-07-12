@@ -75,7 +75,7 @@ class ImportFitTrackUseCaseTest {
 
         val success = assertIs<ImportFitTrackResult.Success>(result)
         assertEquals("track-1", success.importedTrack.id)
-        assertEquals("Morning Ride", success.importedTrack.displayName)
+        assertEquals("ride", success.importedTrack.displayName)
         assertEquals("ride.fit", success.importedTrack.originalFileName)
         assertEquals("tracks/track-1.activity.json", success.importedTrack.storageKey)
         assertEquals(1, success.importedTrack.trackCount)
@@ -88,6 +88,99 @@ class ImportFitTrackUseCaseTest {
         assertEquals("Apple Watch", savedDocument.metadata.source)
         assertEquals("Morning Ride", savedDocument.metadata.name)
         assertEquals(41.7151, savedDocument.tracks.single().segments.single().points.single().latitude)
+    }
+
+    @Test
+    fun fallsBackToEmbeddedNameWhenFileNameIsBlank() = runSuspend {
+        val useCase = ImportFitTrackUseCase(
+            fitFileDecoder = FixedFitFileDecoder(
+                FitDecodeResult.Success(
+                    FitActivityDocument(
+                        metadata = FitActivityMetadata(name = "Morning Ride"),
+                        tracks = listOf(
+                            FitActivityTrack(
+                                segments = listOf(
+                                    FitActivitySegment(
+                                        points = listOf(FitActivityPoint(latitude = 41.7151, longitude = 44.8271)),
+                                    ),
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+            fileStorage = FakeGpxTrackFileStorage(),
+            trackStore = FakeImportedTrackStore(),
+            idGenerator = FixedImportIdGenerator("track-1"),
+            clock = FixedImportClock("2026-05-31T10:00:00Z"),
+        )
+
+        val result = useCase(ImportFitTrackRequest("   ", byteArrayOf(1)))
+
+        val success = assertIs<ImportFitTrackResult.Success>(result)
+        assertEquals("Morning Ride", success.importedTrack.displayName)
+    }
+
+    @Test
+    fun preservesUnicodeFileNameInsteadOfNumericEmbeddedName() = runSuspend {
+        val useCase = ImportFitTrackUseCase(
+            fitFileDecoder = FixedFitFileDecoder(
+                FitDecodeResult.Success(
+                    FitActivityDocument(
+                        metadata = FitActivityMetadata(name = "1752400123"),
+                        tracks = listOf(
+                            FitActivityTrack(
+                                segments = listOf(
+                                    FitActivitySegment(
+                                        points = listOf(FitActivityPoint(latitude = 41.7151, longitude = 44.8271)),
+                                    ),
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+            fileStorage = FakeGpxTrackFileStorage(),
+            trackStore = FakeImportedTrackStore(),
+            idGenerator = FixedImportIdGenerator("track-1"),
+            clock = FixedImportClock("2026-05-31T10:00:00Z"),
+        )
+
+        val result = useCase(ImportFitTrackRequest("залупа слона.fit", byteArrayOf(1)))
+
+        val success = assertIs<ImportFitTrackResult.Success>(result)
+        assertEquals("залупа слона", success.importedTrack.displayName)
+        assertEquals("залупа слона.fit", success.importedTrack.originalFileName)
+    }
+
+    @Test
+    fun fallsBackToUntitledTrackWhenNoNameIsAvailable() = runSuspend {
+        val useCase = ImportFitTrackUseCase(
+            fitFileDecoder = FixedFitFileDecoder(
+                FitDecodeResult.Success(
+                    FitActivityDocument(
+                        tracks = listOf(
+                            FitActivityTrack(
+                                segments = listOf(
+                                    FitActivitySegment(
+                                        points = listOf(FitActivityPoint(latitude = 41.7151, longitude = 44.8271)),
+                                    ),
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+            fileStorage = FakeGpxTrackFileStorage(),
+            trackStore = FakeImportedTrackStore(),
+            idGenerator = FixedImportIdGenerator("track-1"),
+            clock = FixedImportClock("2026-05-31T10:00:00Z"),
+        )
+
+        val result = useCase(ImportFitTrackRequest("", byteArrayOf(1)))
+
+        val success = assertIs<ImportFitTrackResult.Success>(result)
+        assertEquals("Untitled track", success.importedTrack.displayName)
     }
 
     @Test
