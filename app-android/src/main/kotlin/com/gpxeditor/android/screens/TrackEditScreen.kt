@@ -27,6 +27,7 @@ import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.LatLngBounds
+import com.google.maps.android.compose.CameraPositionState
 import com.google.maps.android.compose.GoogleMap
 import com.google.maps.android.compose.MapUiSettings
 import com.google.maps.android.compose.Marker
@@ -58,6 +59,24 @@ fun TrackEditScreen(
     }
     val geometry = remember(editedDocument) { EditableTrackMapGeometry.from(editedDocument) }
     val hasChanges = editedDocument != detail.document
+    val cameraPositionState = rememberCameraPositionState()
+
+    fun movePointTo(pointIndex: Int, latitude: Double, longitude: Double) {
+        when (val result = onMovePoint(editedDocument, pointIndex, latitude, longitude)) {
+            is MoveGpxTrackPointResult.Failure -> {
+                localErrorMessage = result.error.message
+            }
+            is MoveGpxTrackPointResult.Success -> {
+                editedDocument = result.document
+                selectedPointIndex = result.movedPointIndex
+                movingPointIndex = result.movedPointIndex
+                localErrorMessage = null
+                // Undo restores a full pre-delete snapshot, which would
+                // silently revert this move too — drop the history instead.
+                deletedPointSnapshots = emptyList()
+            }
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         if (geometry == null) {
@@ -86,28 +105,9 @@ fun TrackEditScreen(
                 },
                 onMapClick = { position ->
                     val pointIndex = movingPointIndex ?: return@EditableTrackMap
-                    when (
-                        val result = onMovePoint(
-                            editedDocument,
-                            pointIndex,
-                            position.latitude,
-                            position.longitude,
-                        )
-                    ) {
-                        is MoveGpxTrackPointResult.Failure -> {
-                            localErrorMessage = result.error.message
-                        }
-                        is MoveGpxTrackPointResult.Success -> {
-                            editedDocument = result.document
-                            selectedPointIndex = result.movedPointIndex
-                            movingPointIndex = null
-                            localErrorMessage = null
-                            // Undo restores a full pre-delete snapshot, which would
-                            // silently revert this move too — drop the history instead.
-                            deletedPointSnapshots = emptyList()
-                        }
-                    }
+                    movePointTo(pointIndex, position.latitude, position.longitude)
                 },
+                cameraPositionState = cameraPositionState,
                 modifier = Modifier.fillMaxSize(),
             )
         }
@@ -135,21 +135,27 @@ fun TrackEditScreen(
         val selectedPoint = selectedPointIndex?.let { index ->
             geometry?.points?.firstOrNull { it.index == index }
         }
-        if (movingPointIndex != null) {
-            Surface(
+        val movingPoint = movingPointIndex?.let { index ->
+            geometry?.points?.firstOrNull { it.index == index }
+        }
+        if (movingPoint != null) {
+            MovePointControls(
+                onNudge = { latSign, lonSign ->
+                    val step = nudgeStepDegrees(cameraPositionState)
+                    movePointTo(
+                        pointIndex = movingPoint.index,
+                        latitude = movingPoint.position.latitude + latSign * step.latitude,
+                        longitude = movingPoint.position.longitude + lonSign * step.longitude,
+                    )
+                },
+                onSaveClick = {
+                    movingPointIndex = null
+                    localErrorMessage = null
+                },
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(16.dp),
-                color = MaterialTheme.colorScheme.surface,
-                shape = MaterialTheme.shapes.medium,
-                tonalElevation = 8.dp,
-            ) {
-                Text(
-                    text = "Choose where to move the selected point",
-                    modifier = Modifier.padding(16.dp),
-                    style = MaterialTheme.typography.bodyLarge,
-                )
-            }
+            )
         } else if (selectedPoint != null && geometry != null) {
             val pointPosition = geometry.points.indexOf(selectedPoint)
             SelectedPointMenu(
@@ -242,6 +248,79 @@ private fun TrackEditTopBar(
 }
 
 @Composable
+private fun MovePointControls(
+    onNudge: (latSign: Int, lonSign: Int) -> Unit,
+    onSaveClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surface,
+        shape = MaterialTheme.shapes.medium,
+        tonalElevation = 8.dp,
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(
+                text = "Tap the map or use the arrows to move the point",
+                modifier = Modifier.fillMaxWidth(),
+                style = MaterialTheme.typography.bodyLarge,
+            )
+            OutlinedButton(onClick = { onNudge(1, 0) }) {
+                Text("↑")
+            }
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                OutlinedButton(onClick = { onNudge(0, -1) }) {
+                    Text("←")
+                }
+                OutlinedButton(onClick = { onNudge(-1, 0) }) {
+                    Text("↓")
+                }
+                OutlinedButton(onClick = { onNudge(0, 1) }) {
+                    Text("→")
+                }
+            }
+            Button(
+                onClick = onSaveClick,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("Save position")
+            }
+        }
+    }
+}
+
+private data class NudgeStepDegrees(
+    val latitude: Double,
+    val longitude: Double,
+)
+
+// One nudge moves the point by 1% of the visible map span, so the step
+// scales with the current zoom level.
+private fun nudgeStepDegrees(
+    cameraPositionState: CameraPositionState,
+    spanFraction: Double = 0.01,
+    fallbackDegrees: Double = 0.00005,
+): NudgeStepDegrees {
+    val bounds = cameraPositionState.projection?.visibleRegion?.latLngBounds
+        ?: return NudgeStepDegrees(latitude = fallbackDegrees, longitude = fallbackDegrees)
+
+    val latitudeSpan = bounds.northeast.latitude - bounds.southwest.latitude
+    val longitudeSpan = (bounds.northeast.longitude - bounds.southwest.longitude + 360.0) % 360.0
+
+    return NudgeStepDegrees(
+        latitude = (latitudeSpan * spanFraction).takeIf { it > 0.0 } ?: fallbackDegrees,
+        longitude = (longitudeSpan * spanFraction).takeIf { it > 0.0 } ?: fallbackDegrees,
+    )
+}
+
+@Composable
 private fun SelectedPointMenu(
     point: EditableTrackPoint,
     previousPointIndex: Int?,
@@ -313,9 +392,9 @@ private fun EditableTrackMap(
     isMovingPoint: Boolean,
     onPointClick: (Int) -> Unit,
     onMapClick: (LatLng) -> Unit,
+    cameraPositionState: CameraPositionState = rememberCameraPositionState(),
     modifier: Modifier = Modifier,
 ) {
-    val cameraPositionState = rememberCameraPositionState()
     var mapLoaded by remember { mutableStateOf(false) }
     var didSetInitialCamera by remember { mutableStateOf(false) }
 

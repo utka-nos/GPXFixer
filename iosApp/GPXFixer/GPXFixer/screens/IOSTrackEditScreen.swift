@@ -8,6 +8,7 @@ struct IOSTrackEditScreen: View {
 
     @Environment(\.dismiss) private var dismiss
     @StateObject private var viewModel: IOSTrackEditViewModel
+    @State private var mapProxy = EditableTrackMapProxy()
 
     init(
         detail: TrackDetail,
@@ -32,7 +33,8 @@ struct IOSTrackEditScreen: View {
                             latitude: coordinate.latitude,
                             longitude: coordinate.longitude
                         )
-                    }
+                    },
+                    mapProxy: mapProxy
                 )
                 .ignoresSafeArea(edges: .bottom)
             } else {
@@ -40,13 +42,19 @@ struct IOSTrackEditScreen: View {
             }
 
             if viewModel.movingPointIndex != nil {
-                Text("Choose where to move the selected point")
-                    .font(.body)
-                    .padding(16)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(.regularMaterial)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                    .padding(16)
+                MovePointControls(
+                    onNudge: { latitudeSign, longitudeSign in
+                        let step = nudgeStep()
+                        viewModel.nudgeMovingPoint(
+                            latitudeDelta: Double(latitudeSign) * step.latitude,
+                            longitudeDelta: Double(longitudeSign) * step.longitude
+                        )
+                    },
+                    onSave: {
+                        viewModel.finishMovingPoint()
+                    }
+                )
+                .padding(16)
             } else if let selectedPointIndex = viewModel.selectedPointIndex {
                 let neighbors = neighborPointIndices(of: selectedPointIndex)
                 SelectedPointMenu(
@@ -109,6 +117,21 @@ struct IOSTrackEditScreen: View {
         return (previous, next)
     }
 
+    // One nudge moves the point by 1% of the visible map span, so the step
+    // scales with the current zoom level.
+    private func nudgeStep(
+        spanFraction: Double = 0.01,
+        fallbackDegrees: Double = 0.00005
+    ) -> (latitude: Double, longitude: Double) {
+        guard let span = mapProxy.mapView?.region.span,
+              span.latitudeDelta > 0,
+              span.longitudeDelta > 0 else {
+            return (fallbackDegrees, fallbackDegrees)
+        }
+
+        return (span.latitudeDelta * spanFraction, span.longitudeDelta * spanFraction)
+    }
+
     private func pointTime(at index: Int) -> String? {
         var globalPointIndex = 0
         for track in viewModel.document.tracks {
@@ -123,6 +146,61 @@ struct IOSTrackEditScreen: View {
         }
         return nil
     }
+}
+
+private struct MovePointControls: View {
+    let onNudge: (_ latitudeSign: Int, _ longitudeSign: Int) -> Void
+    let onSave: () -> Void
+
+    var body: some View {
+        VStack(spacing: 12) {
+            Text("Tap the map or use the arrows to move the point")
+                .font(.body)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            Button {
+                onNudge(1, 0)
+            } label: {
+                Image(systemName: "arrow.up")
+            }
+            .buttonStyle(.bordered)
+
+            HStack(spacing: 12) {
+                Button {
+                    onNudge(0, -1)
+                } label: {
+                    Image(systemName: "arrow.left")
+                }
+                .buttonStyle(.bordered)
+
+                Button {
+                    onNudge(-1, 0)
+                } label: {
+                    Image(systemName: "arrow.down")
+                }
+                .buttonStyle(.bordered)
+
+                Button {
+                    onNudge(0, 1)
+                } label: {
+                    Image(systemName: "arrow.right")
+                }
+                .buttonStyle(.bordered)
+            }
+
+            Button("Save position", action: onSave)
+                .buttonStyle(.borderedProminent)
+                .frame(maxWidth: .infinity)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity)
+        .background(.regularMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+}
+
+final class EditableTrackMapProxy {
+    weak var mapView: MKMapView?
 }
 
 private struct SelectedPointMenu: View {
@@ -191,6 +269,7 @@ private struct EditableTrackMap: UIViewRepresentable {
     @Binding var selectedPointIndex: Int?
     let isMovingPoint: Bool
     let onMapTap: (CLLocationCoordinate2D) -> Void
+    let mapProxy: EditableTrackMapProxy
 
     func makeCoordinator() -> Coordinator {
         Coordinator(
@@ -202,6 +281,7 @@ private struct EditableTrackMap: UIViewRepresentable {
 
     func makeUIView(context: Context) -> MKMapView {
         let mapView = MKMapView()
+        mapProxy.mapView = mapView
         mapView.delegate = context.coordinator
         mapView.pointOfInterestFilter = .excludingAll
         mapView.showsCompass = true
