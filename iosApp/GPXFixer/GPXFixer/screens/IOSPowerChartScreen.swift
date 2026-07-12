@@ -58,6 +58,16 @@ struct IOSPowerChartScreen: View {
             }
 
             chart(presentation: presentation, activeWindow: activeWindow)
+
+            ChartPanSlider(
+                samples: samples,
+                fullWindow: fullWindow,
+                window: activeWindow,
+                onWindowChange: { newWindow in
+                    window = newWindow
+                    selectedSample = nil
+                }
+            )
         }
         .padding()
         .accessibilityElement(children: .contain)
@@ -274,5 +284,72 @@ struct IOSPowerChartScreen: View {
                 + ", \(selected.powerWatts) watts"
         }
         return text
+    }
+}
+
+/// Scrollbar-style pan control under the chart: the track represents the whole
+/// ride, the thumb the visible window. Dragging it pans the window at the
+/// current zoom level.
+private struct ChartPanSlider: View {
+    let samples: [PowerChartSample]
+    let fullWindow: PowerChartWindow
+    let window: PowerChartWindow
+    let onWindowChange: (PowerChartWindow) -> Void
+
+    @State private var windowAtDragStart: PowerChartWindow?
+
+    var body: some View {
+        GeometryReader { geometry in
+            let trackWidth = geometry.size.width
+            let trackHeight = geometry.size.height
+            let fullDuration = max(Double(fullWindow.durationSeconds), 1)
+            let minThumbWidth = trackHeight * 2
+            let thumbWidth = min(
+                max(trackWidth * Double(window.durationSeconds) / fullDuration, minThumbWidth),
+                trackWidth
+            )
+            let thumbOffset = min(
+                max(
+                    trackWidth * Double(window.startSeconds - fullWindow.startSeconds) / fullDuration,
+                    0
+                ),
+                trackWidth - thumbWidth
+            )
+
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(Color(.systemFill))
+                Capsule()
+                    .fill(Color.accentColor)
+                    .frame(width: thumbWidth)
+                    .offset(x: thumbOffset)
+            }
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { value in
+                        if windowAtDragStart == nil {
+                            windowAtDragStart = window
+                        }
+                        guard let startWindow = windowAtDragStart, trackWidth > 0 else { return }
+                        let deltaSeconds = Int64(
+                            (Double(value.translation.width) / trackWidth * fullDuration).rounded()
+                        )
+                        onWindowChange(
+                            PowerChartPresenter.shared.panned(
+                                samples: samples,
+                                window: startWindow,
+                                deltaSeconds: deltaSeconds
+                            )
+                        )
+                    }
+                    .onEnded { _ in
+                        windowAtDragStart = nil
+                    }
+            )
+        }
+        .frame(height: 14)
+        .accessibilityLabel("Chart position")
+        .accessibilityHint("Drag to move the visible range")
     }
 }
