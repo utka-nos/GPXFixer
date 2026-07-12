@@ -5,8 +5,9 @@ These instructions apply to all work in this repository. Follow them unless the 
 ## GitHub issue identifiers
 
 - In the rules below, `<issue-number>` is the numeric GitHub issue number.
-- Format the ticket identifier as `GPX-#<issue-number>`.
-- Example: GitHub issue `42` has the ticket identifier `GPX-#42`.
+- Format the ticket identifier as `GPX-<issue-number>`.
+- Example: GitHub issue `42` has the ticket identifier `GPX-42`.
+- Do not use `#` in ticket identifiers, branch names, or commit-message prefixes: shells with interactive comments enabled treat everything after `#` as a comment, which breaks unquoted `git push`/`git checkout` commands.
 
 ## Branches
 
@@ -14,23 +15,23 @@ These instructions apply to all work in this repository. Follow them unless the 
 - Before creating a branch, fetch the latest remote state when possible so that `origin/main` is current.
 - For work associated with a GitHub issue, use this branch name:
 
-  `feature/GPX-#<issue-number>`
+  `feature/GPX-<issue-number>`
 
 - An optional short description may follow the required name. Use lowercase kebab-case:
 
-  `feature/GPX-#<issue-number>-<short-description>`
+  `feature/GPX-<issue-number>-<short-description>`
 
 - Examples:
-  - `feature/GPX-#42`
-  - `feature/GPX-#42-fix-track-import`
+  - `feature/GPX-42`
+  - `feature/GPX-42-fix-track-import`
 
 ## Commits
 
 - Every commit associated with a GitHub issue must start with its ticket identifier, followed by a space and a concise imperative description:
 
-  `GPX-#<issue-number> <description>`
+  `GPX-<issue-number> <description>`
 
-- Example: `GPX-#42 Fix track import validation`
+- Example: `GPX-42 Fix track import validation`
 - Commits unrelated to a GitHub issue do not require this prefix.
 
 ## Pull requests
