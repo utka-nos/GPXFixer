@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import com.gpxeditor.android.ImportScreenState
 import com.gpxeditor.android.recording.HeartRateSensorController
 import com.gpxeditor.android.recording.PowerSensorController
+import com.gpxeditor.shared.data.profile.UserProfileRepository
 import com.gpxeditor.shared.domain.activity.ActivityDocument
 import com.gpxeditor.shared.domain.imported.ImportedTrack
 import com.gpxeditor.shared.feature.edittrack.DeleteGpxTrackPointResult
@@ -55,10 +56,12 @@ fun ImportScreen(
     onDiscardRecording: () -> Unit,
     powerSensorController: PowerSensorController,
     heartRateSensorController: HeartRateSensorController,
+    userProfileRepository: UserProfileRepository,
 ) {
     var trackPendingDelete by remember { mutableStateOf<ImportedTrack?>(null) }
     var isRecordingOpen by remember { mutableStateOf(false) }
     var isSensorsOpen by remember { mutableStateOf(false) }
+    var isProfileOpen by remember { mutableStateOf(false) }
 
     MaterialTheme {
         Surface(modifier = Modifier.fillMaxSize()) {
@@ -77,6 +80,14 @@ fun ImportScreen(
                     powerSensorController = powerSensorController,
                     heartRateSensorController = heartRateSensorController,
                     onBackClick = { isSensorsOpen = false },
+                )
+                return@Surface
+            }
+
+            if (isProfileOpen) {
+                ProfileScreen(
+                    repository = userProfileRepository,
+                    onBackClick = { isProfileOpen = false },
                 )
                 return@Surface
             }
@@ -153,6 +164,9 @@ fun ImportScreen(
                     }
                     Button(onClick = { isSensorsOpen = true }) {
                         Text("Sensors")
+                    }
+                    Button(onClick = { isProfileOpen = true }) {
+                        Text("Profile")
                     }
                     if (state.isImporting) {
                         CircularProgressIndicator()

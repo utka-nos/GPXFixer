@@ -17,6 +17,7 @@ import com.gpxeditor.android.data.imported.AndroidGpxTrackFileStorage
 import com.gpxeditor.android.data.imported.AndroidImportClock
 import com.gpxeditor.android.data.imported.AndroidImportIdGenerator
 import com.gpxeditor.android.data.imported.JsonImportedTrackStore
+import com.gpxeditor.android.data.profile.FileUserProfileStorage
 import com.gpxeditor.android.recording.FileHeartRateSensorSettingsStorage
 import com.gpxeditor.android.recording.FileRecordingJournal
 import com.gpxeditor.android.recording.FilePowerSensorSettingsStorage
@@ -29,6 +30,7 @@ import com.gpxeditor.shared.data.ble.HeartRateSensorSettingsStore
 import com.gpxeditor.shared.data.ble.KableHeartRateSensor
 import com.gpxeditor.shared.data.ble.KablePowerSensor
 import com.gpxeditor.shared.data.ble.PowerSensorSettingsStore
+import com.gpxeditor.shared.data.profile.UserProfileRepository
 import com.gpxeditor.shared.feature.deletetrack.DeleteImportedTrackUseCase
 import com.gpxeditor.shared.feature.edittrack.DeleteGpxTrackPointUseCase
 import com.gpxeditor.shared.feature.edittrack.MoveGpxTrackPointUseCase
@@ -57,6 +59,7 @@ class MainActivity : ComponentActivity() {
         val importedTrackStore = JsonImportedTrackStore(applicationContext)
         val importIdGenerator = AndroidImportIdGenerator()
         val importClock = AndroidImportClock()
+        val userProfileRepository = UserProfileRepository(FileUserProfileStorage(applicationContext))
         powerSensorController = PowerSensorController(
             scope = sensorScope,
             sensor = KablePowerSensor(sensorScope),
@@ -148,6 +151,7 @@ class MainActivity : ComponentActivity() {
                 onDiscardRecording = importScreenController::discardRecoveredRecording,
                 powerSensorController = powerSensorController,
                 heartRateSensorController = heartRateSensorController,
+                userProfileRepository = userProfileRepository,
             )
         }
 
