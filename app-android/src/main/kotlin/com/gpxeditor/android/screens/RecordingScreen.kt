@@ -15,6 +15,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -65,62 +66,61 @@ fun RecordingScreen(onBackClick: () -> Unit) {
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        Row {
-            Button(onClick = onBackClick) {
-                Text("Back")
-            }
-        }
-
-        Text(
-            text = "Record track",
-            style = MaterialTheme.typography.headlineMedium,
-        )
-
-        val currentStats = stats
-        if (currentStats == null) {
-            val saveMessage by TrackRecordingService.lastSaveMessage.collectAsState()
-            saveMessage?.let { message ->
-                Text(
-                    text = message,
-                    color = MaterialTheme.colorScheme.primary,
-                    style = MaterialTheme.typography.bodyMedium,
+    Scaffold(
+        topBar = {
+            AppTopBar(
+                title = "Record track",
+                onBackClick = onBackClick,
+            )
+        },
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            val currentStats = stats
+            if (currentStats == null) {
+                val saveMessage by TrackRecordingService.lastSaveMessage.collectAsState()
+                saveMessage?.let { message ->
+                    Text(
+                        text = message,
+                        color = MaterialTheme.colorScheme.primary,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+                IdleContent(
+                    permissionsGranted = permissionsGranted,
+                    onStartClick = {
+                        RecordingPermissions.logStatus(context, "start click")
+                        if (RecordingPermissions.allGranted(context)) {
+                            permissionsGranted = true
+                            Log.i(RecordingPermissions.TAG, "Starting recording service")
+                            TrackRecordingService.start(context)
+                        } else {
+                            Log.i(
+                                RecordingPermissions.TAG,
+                                "Requesting permissions: ${RecordingPermissions.missing(context)}",
+                            )
+                            permissionLauncher.launch(RecordingPermissions.required())
+                        }
+                    },
+                )
+            } else {
+                ActiveRecordingContent(
+                    stats = currentStats,
+                    routeSegments = routeSegments,
+                    powerChartSamples = powerChartSamples,
+                    powerSensorStatus = powerSensorStatus,
+                    heartRateSensorStatus = heartRateSensorStatus,
+                    onPauseClick = { TrackRecordingService.pause(context) },
+                    onResumeClick = { TrackRecordingService.resume(context) },
+                    onStopClick = { showStopConfirmation = true },
                 )
             }
-            IdleContent(
-                permissionsGranted = permissionsGranted,
-                onStartClick = {
-                    RecordingPermissions.logStatus(context, "start click")
-                    if (RecordingPermissions.allGranted(context)) {
-                        permissionsGranted = true
-                        Log.i(RecordingPermissions.TAG, "Starting recording service")
-                        TrackRecordingService.start(context)
-                    } else {
-                        Log.i(
-                            RecordingPermissions.TAG,
-                            "Requesting permissions: ${RecordingPermissions.missing(context)}",
-                        )
-                        permissionLauncher.launch(RecordingPermissions.required())
-                    }
-                },
-            )
-        } else {
-            ActiveRecordingContent(
-                stats = currentStats,
-                routeSegments = routeSegments,
-                powerChartSamples = powerChartSamples,
-                powerSensorStatus = powerSensorStatus,
-                heartRateSensorStatus = heartRateSensorStatus,
-                onPauseClick = { TrackRecordingService.pause(context) },
-                onResumeClick = { TrackRecordingService.resume(context) },
-                onStopClick = { showStopConfirmation = true },
-            )
         }
     }
 

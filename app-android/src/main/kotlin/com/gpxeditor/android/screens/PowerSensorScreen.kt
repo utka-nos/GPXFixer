@@ -15,6 +15,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -44,47 +45,55 @@ fun PowerSensorScreen(controller: PowerSensorController, onBackClick: () -> Unit
         onDispose(controller::closeScreen)
     }
 
-    Column(
-        modifier = Modifier.fillMaxSize().padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Button(onClick = onBackClick) { Text("Back") }
-        }
-        Text("Power sensor", style = MaterialTheme.typography.headlineMedium)
+    Scaffold(
+        topBar = {
+            AppTopBar(
+                title = "Power sensor",
+                onBackClick = onBackClick,
+            )
+        },
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .padding(horizontal = 16.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
 
-        state.selected?.let { selected ->
-            Text("Selected: ${selected.name ?: selected.id}")
-            TextButton(onClick = controller::forget) { Text("Forget sensor") }
-        }
-
-        when (val connection = state.connectionState) {
-            is PowerSensorConnectionState.Connecting -> Text("Connecting…")
-            is PowerSensorConnectionState.Connected -> Text("Connected", color = MaterialTheme.colorScheme.primary)
-            is PowerSensorConnectionState.Failed -> Text(connection.message, color = MaterialTheme.colorScheme.error)
-            else -> Unit
-        }
-        state.errorMessage?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-
-        if (!BleSensorPermissions.allGranted(context)) {
-            Text("Bluetooth permission is required to find cycling power sensors.")
-            Button(onClick = { permissionLauncher.launch(BleSensorPermissions.required()) }) {
-                Text("Allow Bluetooth")
+            state.selected?.let { selected ->
+                Text("Selected: ${selected.name ?: selected.id}")
+                TextButton(onClick = controller::forget) { Text("Forget sensor") }
             }
-        } else {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Button(onClick = controller::startScan, enabled = !state.isScanning) { Text("Scan") }
-                if (state.isScanning) CircularProgressIndicator()
+
+            when (val connection = state.connectionState) {
+                is PowerSensorConnectionState.Connecting -> Text("Connecting…")
+                is PowerSensorConnectionState.Connected -> Text("Connected", color = MaterialTheme.colorScheme.primary)
+                is PowerSensorConnectionState.Failed -> Text(connection.message, color = MaterialTheme.colorScheme.error)
+                else -> Unit
             }
-            LazyColumn(modifier = Modifier.fillMaxWidth()) {
-                items(state.devices, key = { it.id }) { device ->
-                    Column(
-                        modifier = Modifier.fillMaxWidth().clickable { controller.select(device) }.padding(vertical = 14.dp),
-                    ) {
-                        Text(device.name ?: "Cycling power sensor", style = MaterialTheme.typography.titleMedium)
-                        Text("RSSI ${device.rssi} dBm", style = MaterialTheme.typography.bodyMedium)
+            state.errorMessage?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+
+            if (!BleSensorPermissions.allGranted(context)) {
+                Text("Bluetooth permission is required to find cycling power sensors.")
+                Button(onClick = { permissionLauncher.launch(BleSensorPermissions.required()) }) {
+                    Text("Allow Bluetooth")
+                }
+            } else {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Button(onClick = controller::startScan, enabled = !state.isScanning) { Text("Scan") }
+                    if (state.isScanning) CircularProgressIndicator()
+                }
+                LazyColumn(modifier = Modifier.fillMaxWidth()) {
+                    items(state.devices, key = { it.id }) { device ->
+                        Column(
+                            modifier = Modifier.fillMaxWidth().clickable { controller.select(device) }.padding(vertical = 14.dp),
+                        ) {
+                            Text(device.name ?: "Cycling power sensor", style = MaterialTheme.typography.titleMedium)
+                            Text("RSSI ${device.rssi} dBm", style = MaterialTheme.typography.bodyMedium)
+                        }
+                        HorizontalDivider()
                     }
-                    HorizontalDivider()
                 }
             }
         }

@@ -8,9 +8,15 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Undo
+import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -83,170 +89,156 @@ fun TrackEditScreen(
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        if (geometry == null) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(24.dp),
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Text(
-                    text = "No track geometry",
-                    style = MaterialTheme.typography.bodyLarge,
-                )
-            }
-        } else {
-            EditableTrackMap(
-                geometry = geometry,
-                selectedPointIndex = selectedPointIndex,
-                isMovingPoint = movingPointIndex != null,
-                onPointClick = { pointIndex ->
-                    if (movingPointIndex == null) {
-                        selectedPointIndex = pointIndex
-                        localErrorMessage = null
+    Scaffold(
+        topBar = {
+            AppTopBar(
+                title = "Edit points",
+                onBackClick = onBackClick,
+                actions = {
+                    IconButton(
+                        enabled = deletedPointSnapshots.isNotEmpty() && !isSaving,
+                        onClick = {
+                            deletedPointSnapshots.lastOrNull()?.let { snapshot ->
+                                editedDocument = snapshot.document
+                                selectedPointIndex = snapshot.pointIndex
+                                movingPointIndex = null
+                                localErrorMessage = null
+                                deletedPointSnapshots = deletedPointSnapshots.dropLast(1)
+                            }
+                        },
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.Undo,
+                            contentDescription = "Undo delete",
+                        )
+                    }
+                    IconButton(
+                        enabled = hasChanges && !isSaving,
+                        onClick = { onSaveClick(editedDocument) },
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Save,
+                            contentDescription = "Save edited track",
+                        )
                     }
                 },
-                onMapClick = { position ->
-                    val pointIndex = movingPointIndex ?: return@EditableTrackMap
-                    movePointTo(pointIndex, position.latitude, position.longitude)
-                },
-                cameraPositionState = cameraPositionState,
-                modifier = Modifier.fillMaxSize(),
             )
-        }
-
-        TrackEditTopBar(
-            isSaving = isSaving,
-            canSave = hasChanges && !isSaving,
-            canUndoDelete = deletedPointSnapshots.isNotEmpty() && !isSaving,
-            onBackClick = onBackClick,
-            onUndoDeleteClick = {
-                deletedPointSnapshots.lastOrNull()?.let { snapshot ->
-                    editedDocument = snapshot.document
-                    selectedPointIndex = snapshot.pointIndex
-                    movingPointIndex = null
-                    localErrorMessage = null
-                    deletedPointSnapshots = deletedPointSnapshots.dropLast(1)
-                }
-            },
-            onSaveClick = { onSaveClick(editedDocument) },
+        },
+    ) { innerPadding ->
+        Box(
             modifier = Modifier
-                .align(Alignment.TopCenter)
-                .padding(16.dp),
-        )
-
-        val selectedPoint = selectedPointIndex?.let { index ->
-            geometry?.points?.firstOrNull { it.index == index }
-        }
-        val movingPoint = movingPointIndex?.let { index ->
-            geometry?.points?.firstOrNull { it.index == index }
-        }
-        if (movingPoint != null) {
-            MovePointControls(
-                onNudge = { latSign, lonSign ->
-                    val step = nudgeStepDegrees(cameraPositionState)
-                    movePointTo(
-                        pointIndex = movingPoint.index,
-                        latitude = movingPoint.position.latitude + latSign * step.latitude,
-                        longitude = movingPoint.position.longitude + lonSign * step.longitude,
+                .fillMaxSize()
+                .padding(innerPadding),
+        ) {
+            if (geometry == null) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(24.dp),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Text(
+                        text = "No track geometry",
+                        style = MaterialTheme.typography.bodyLarge,
                     )
-                },
-                onSaveClick = {
-                    movingPointIndex = null
-                    localErrorMessage = null
-                },
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(16.dp),
-            )
-        } else if (selectedPoint != null && geometry != null) {
-            val pointPosition = geometry.points.indexOf(selectedPoint)
-            SelectedPointMenu(
-                point = selectedPoint,
-                previousPointIndex = geometry.points.getOrNull(pointPosition - 1)?.index,
-                nextPointIndex = geometry.points.getOrNull(pointPosition + 1)?.index,
-                onSelectPoint = { pointIndex ->
-                    selectedPointIndex = pointIndex
-                    localErrorMessage = null
-                },
-                onDeleteClick = {
-                    when (val result = onDeletePoint(editedDocument, selectedPoint.index)) {
-                        is DeleteGpxTrackPointResult.Failure -> {
-                            localErrorMessage = result.error.message
-                        }
-                        is DeleteGpxTrackPointResult.Success -> {
-                            deletedPointSnapshots = deletedPointSnapshots + DeletedPointSnapshot(
-                                document = editedDocument,
-                                pointIndex = selectedPoint.index,
-                            )
-                            editedDocument = result.document
-                            selectedPointIndex = null
+                }
+            } else {
+                EditableTrackMap(
+                    geometry = geometry,
+                    selectedPointIndex = selectedPointIndex,
+                    isMovingPoint = movingPointIndex != null,
+                    onPointClick = { pointIndex ->
+                        if (movingPointIndex == null) {
+                            selectedPointIndex = pointIndex
                             localErrorMessage = null
                         }
-                    }
-                },
-                onMoveClick = {
-                    movingPointIndex = selectedPoint.index
-                    localErrorMessage = null
-                },
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(16.dp),
-            )
-        }
-
-        val visibleErrorMessage = localErrorMessage ?: errorMessage
-        if (visibleErrorMessage != null) {
-            Surface(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(16.dp),
-                color = MaterialTheme.colorScheme.errorContainer,
-                shape = MaterialTheme.shapes.medium,
-                tonalElevation = 6.dp,
-            ) {
-                Text(
-                    text = visibleErrorMessage,
-                    modifier = Modifier.padding(16.dp),
-                    color = MaterialTheme.colorScheme.onErrorContainer,
+                    },
+                    onMapClick = { position ->
+                        val pointIndex = movingPointIndex ?: return@EditableTrackMap
+                        movePointTo(pointIndex, position.latitude, position.longitude)
+                    },
+                    cameraPositionState = cameraPositionState,
+                    modifier = Modifier.fillMaxSize(),
                 )
             }
-        }
-    }
-}
 
-@Composable
-private fun TrackEditTopBar(
-    isSaving: Boolean,
-    canSave: Boolean,
-    canUndoDelete: Boolean,
-    onBackClick: () -> Unit,
-    onUndoDeleteClick: () -> Unit,
-    onSaveClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surface,
-        shape = MaterialTheme.shapes.medium,
-        tonalElevation = 6.dp,
-    ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Button(onClick = onBackClick, enabled = !isSaving) {
-                Text("Back")
+            val selectedPoint = selectedPointIndex?.let { index ->
+                geometry?.points?.firstOrNull { it.index == index }
             }
-            Spacer(modifier = Modifier.weight(1f))
-            OutlinedButton(onClick = onUndoDeleteClick, enabled = canUndoDelete) {
-                Text("Undo delete")
+            val movingPoint = movingPointIndex?.let { index ->
+                geometry?.points?.firstOrNull { it.index == index }
             }
-            Button(onClick = onSaveClick, enabled = canSave) {
-                Text(if (isSaving) "Saving" else "Save")
+            if (movingPoint != null) {
+                MovePointControls(
+                    onNudge = { latSign, lonSign ->
+                        val step = nudgeStepDegrees(cameraPositionState)
+                        movePointTo(
+                            pointIndex = movingPoint.index,
+                            latitude = movingPoint.position.latitude + latSign * step.latitude,
+                            longitude = movingPoint.position.longitude + lonSign * step.longitude,
+                        )
+                    },
+                    onSaveClick = {
+                        movingPointIndex = null
+                        localErrorMessage = null
+                    },
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(16.dp),
+                )
+            } else if (selectedPoint != null && geometry != null) {
+                val pointPosition = geometry.points.indexOf(selectedPoint)
+                SelectedPointMenu(
+                    point = selectedPoint,
+                    previousPointIndex = geometry.points.getOrNull(pointPosition - 1)?.index,
+                    nextPointIndex = geometry.points.getOrNull(pointPosition + 1)?.index,
+                    onSelectPoint = { pointIndex ->
+                        selectedPointIndex = pointIndex
+                        localErrorMessage = null
+                    },
+                    onDeleteClick = {
+                        when (val result = onDeletePoint(editedDocument, selectedPoint.index)) {
+                            is DeleteGpxTrackPointResult.Failure -> {
+                                localErrorMessage = result.error.message
+                            }
+                            is DeleteGpxTrackPointResult.Success -> {
+                                deletedPointSnapshots = deletedPointSnapshots + DeletedPointSnapshot(
+                                    document = editedDocument,
+                                    pointIndex = selectedPoint.index,
+                                )
+                                editedDocument = result.document
+                                selectedPointIndex = null
+                                localErrorMessage = null
+                            }
+                        }
+                    },
+                    onMoveClick = {
+                        movingPointIndex = selectedPoint.index
+                        localErrorMessage = null
+                    },
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(16.dp),
+                )
+            }
+
+            val visibleErrorMessage = localErrorMessage ?: errorMessage
+            if (visibleErrorMessage != null) {
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(16.dp),
+                    color = MaterialTheme.colorScheme.errorContainer,
+                    shape = MaterialTheme.shapes.medium,
+                    tonalElevation = 6.dp,
+                ) {
+                    Text(
+                        text = visibleErrorMessage,
+                        modifier = Modifier.padding(16.dp),
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                    )
+                }
             }
         }
     }
