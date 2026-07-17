@@ -13,6 +13,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -76,17 +77,22 @@ fun ProfileScreen(
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        Row {
-            Button(onClick = onBackClick) { Text("Back") }
-        }
-        Text("Profile", style = MaterialTheme.typography.headlineMedium)
+    Scaffold(
+        topBar = {
+            AppTopBar(
+                title = "Profile",
+                onBackClick = onBackClick,
+            )
+        },
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
 
         ProfileNumberField(
             label = "Weight (kg)",
@@ -211,12 +217,13 @@ fun ProfileScreen(
         }
 
         Button(onClick = ::save) { Text("Save") }
-        statusMessage?.let { message ->
-            Text(
-                text = message,
-                color = MaterialTheme.colorScheme.primary,
-                style = MaterialTheme.typography.bodyMedium,
-            )
+            statusMessage?.let { message ->
+                Text(
+                    text = message,
+                    color = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
         }
     }
 }

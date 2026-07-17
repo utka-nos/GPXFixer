@@ -2,16 +2,22 @@ package com.gpxeditor.android.screens
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.FiberManualRecord
+import androidx.compose.material.icons.filled.ManageAccounts
+import androidx.compose.material.icons.filled.Sensors
+import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -19,7 +25,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.gpxeditor.android.ImportScreenState
@@ -64,116 +69,121 @@ fun ImportScreen(
     var isProfileOpen by remember { mutableStateOf(false) }
 
     MaterialTheme {
-        Surface(modifier = Modifier.fillMaxSize()) {
-            if (isRecordingOpen) {
-                RecordingScreen(
-                    onBackClick = {
-                        isRecordingOpen = false
-                        onRecordingClosed()
+        if (isRecordingOpen) {
+            RecordingScreen(
+                onBackClick = {
+                    isRecordingOpen = false
+                    onRecordingClosed()
+                },
+            )
+            return@MaterialTheme
+        }
+
+        if (isSensorsOpen) {
+            SensorsScreen(
+                powerSensorController = powerSensorController,
+                heartRateSensorController = heartRateSensorController,
+                onBackClick = { isSensorsOpen = false },
+            )
+            return@MaterialTheme
+        }
+
+        if (isProfileOpen) {
+            ProfileScreen(
+                repository = userProfileRepository,
+                onBackClick = { isProfileOpen = false },
+            )
+            return@MaterialTheme
+        }
+
+        state.editTrackDetail?.let { detail ->
+            TrackEditScreen(
+                detail = detail,
+                isSaving = state.isLoadingTrackDetail,
+                errorMessage = state.errorMessage,
+                onBackClick = onBackFromEdit,
+                onDeletePoint = onDeleteTrackPoint,
+                onMovePoint = onMoveTrackPoint,
+                onSaveClick = onSaveEditedTrack,
+            )
+            return@MaterialTheme
+        }
+
+        state.trimTrackDetail?.let { detail ->
+            TrackTrimScreen(
+                detail = detail,
+                isSaving = state.isLoadingTrackDetail,
+                statusMessage = state.statusMessage,
+                errorMessage = state.errorMessage,
+                onBackClick = onBackFromTrim,
+                onPreviewTrim = onPreviewTrim,
+                onSaveClick = onSaveTrimmedTrack,
+            )
+            return@MaterialTheme
+        }
+
+        state.selectedTrackDetail?.let { detail ->
+            TrackDetailScreen(
+                detail = detail,
+                statusMessage = state.statusMessage,
+                errorMessage = state.errorMessage,
+                onBackClick = onBackFromDetail,
+                onRenameConfirm = onRenameTrack,
+                onTrimClick = onTrimTrack,
+                onEditClick = onEditTrack,
+                onExportGpxClick = onExportTrackAsGpx,
+                onExportFitClick = onExportTrackAsFit,
+            )
+            return@MaterialTheme
+        }
+
+        Scaffold(
+            topBar = {
+                AppTopBar(
+                    title = "GPXFixer",
+                    actions = {
+                        IconButton(
+                            enabled = !state.isImporting,
+                            onClick = onImportClick,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.UploadFile,
+                                contentDescription = "Import track",
+                            )
+                        }
+                        IconButton(onClick = { isRecordingOpen = true }) {
+                            Icon(
+                                imageVector = Icons.Default.FiberManualRecord,
+                                contentDescription = "Record track",
+                                tint = MaterialTheme.colorScheme.error,
+                            )
+                        }
+                        IconButton(onClick = { isSensorsOpen = true }) {
+                            Icon(
+                                imageVector = Icons.Default.Sensors,
+                                contentDescription = "Sensors",
+                            )
+                        }
+                        IconButton(onClick = { isProfileOpen = true }) {
+                            Icon(
+                                imageVector = Icons.Default.ManageAccounts,
+                                contentDescription = "Edit profile",
+                            )
+                        }
                     },
                 )
-                return@Surface
-            }
-
-            if (isSensorsOpen) {
-                SensorsScreen(
-                    powerSensorController = powerSensorController,
-                    heartRateSensorController = heartRateSensorController,
-                    onBackClick = { isSensorsOpen = false },
-                )
-                return@Surface
-            }
-
-            if (isProfileOpen) {
-                ProfileScreen(
-                    repository = userProfileRepository,
-                    onBackClick = { isProfileOpen = false },
-                )
-                return@Surface
-            }
-
-            state.editTrackDetail?.let { detail ->
-                TrackEditScreen(
-                    detail = detail,
-                    isSaving = state.isLoadingTrackDetail,
-                    errorMessage = state.errorMessage,
-                    onBackClick = onBackFromEdit,
-                    onDeletePoint = onDeleteTrackPoint,
-                    onMovePoint = onMoveTrackPoint,
-                    onSaveClick = onSaveEditedTrack,
-                )
-                return@Surface
-            }
-
-            state.trimTrackDetail?.let { detail ->
-                TrackTrimScreen(
-                    detail = detail,
-                    isSaving = state.isLoadingTrackDetail,
-                    statusMessage = state.statusMessage,
-                    errorMessage = state.errorMessage,
-                    onBackClick = onBackFromTrim,
-                    onPreviewTrim = onPreviewTrim,
-                    onSaveClick = onSaveTrimmedTrack,
-                )
-                return@Surface
-            }
-
-            state.selectedTrackDetail?.let { detail ->
-                TrackDetailScreen(
-                    detail = detail,
-                    statusMessage = state.statusMessage,
-                    errorMessage = state.errorMessage,
-                    onBackClick = onBackFromDetail,
-                    onRenameConfirm = onRenameTrack,
-                    onTrimClick = onTrimTrack,
-                    onEditClick = onEditTrack,
-                    onExportGpxClick = onExportTrackAsGpx,
-                    onExportFitClick = onExportTrackAsFit,
-                )
-                return@Surface
-            }
-
+            },
+        ) { innerPadding ->
             Column(
                 modifier = Modifier
                     .fillMaxSize()
+                    .padding(innerPadding)
                     .verticalScroll(rememberScrollState())
-                    .padding(24.dp),
+                    .padding(horizontal = 16.dp, vertical = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                Text(
-                    text = "GPXFixer",
-                    style = MaterialTheme.typography.headlineMedium,
-                )
-                Text(
-                    text = "Imported tracks",
-                    style = MaterialTheme.typography.titleMedium,
-                )
-
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Button(
-                        enabled = !state.isImporting,
-                        onClick = onImportClick,
-                    ) {
-                        Text(if (state.isImporting) "Importing" else "Import GPX")
-                    }
-                    Button(onClick = { isRecordingOpen = true }) {
-                        Text("Record")
-                    }
-                    Button(onClick = { isSensorsOpen = true }) {
-                        Text("Sensors")
-                    }
-                    Button(onClick = { isProfileOpen = true }) {
-                        Text("Profile")
-                    }
-                    if (state.isImporting) {
-                        CircularProgressIndicator()
-                    }
-                    if (state.isLoadingTrackDetail) {
-                        CircularProgressIndicator()
-                    }
+                if (state.isImporting || state.isLoadingTrackDetail) {
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                 }
 
                 state.statusMessage?.let { message ->
@@ -191,6 +201,11 @@ fun ImportScreen(
                     )
                 }
 
+                Text(
+                    text = "Imported tracks",
+                    style = MaterialTheme.typography.titleMedium,
+                )
+
                 if (state.tracks.isEmpty()) {
                     EmptyHistory()
                 } else {
@@ -203,53 +218,53 @@ fun ImportScreen(
                     }
                 }
             }
+        }
 
-            state.recoveredRecording?.let { recovered ->
-                AlertDialog(
-                    onDismissRequest = onDiscardRecording,
-                    title = { Text("Unfinished recording found") },
-                    text = {
-                        Text(
-                            "A recording was interrupted before it could be saved: " +
-                                "${recovered.stats.pointCount} points, " +
-                                "${formatDistance(recovered.stats.distanceMeters)}. Restore it?",
-                        )
-                    },
-                    confirmButton = {
-                        TextButton(onClick = onRestoreRecording) {
-                            Text("Restore")
-                        }
-                    },
-                    dismissButton = {
-                        TextButton(onClick = onDiscardRecording) {
-                            Text("Discard", color = MaterialTheme.colorScheme.error)
-                        }
-                    },
-                )
-            }
+        state.recoveredRecording?.let { recovered ->
+            AlertDialog(
+                onDismissRequest = onDiscardRecording,
+                title = { Text("Unfinished recording found") },
+                text = {
+                    Text(
+                        "A recording was interrupted before it could be saved: " +
+                            "${recovered.stats.pointCount} points, " +
+                            "${formatDistance(recovered.stats.distanceMeters)}. Restore it?",
+                    )
+                },
+                confirmButton = {
+                    TextButton(onClick = onRestoreRecording) {
+                        Text("Restore")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = onDiscardRecording) {
+                        Text("Discard", color = MaterialTheme.colorScheme.error)
+                    }
+                },
+            )
+        }
 
-            trackPendingDelete?.let { track ->
-                AlertDialog(
-                    onDismissRequest = { trackPendingDelete = null },
-                    title = { Text("Delete track?") },
-                    text = { Text("\"${track.displayName}\" will be removed permanently.") },
-                    confirmButton = {
-                        TextButton(
-                            onClick = {
-                                trackPendingDelete = null
-                                onDeleteTrack(track)
-                            },
-                        ) {
-                            Text("Delete", color = MaterialTheme.colorScheme.error)
-                        }
-                    },
-                    dismissButton = {
-                        TextButton(onClick = { trackPendingDelete = null }) {
-                            Text("Cancel")
-                        }
-                    },
-                )
-            }
+        trackPendingDelete?.let { track ->
+            AlertDialog(
+                onDismissRequest = { trackPendingDelete = null },
+                title = { Text("Delete track?") },
+                text = { Text("\"${track.displayName}\" will be removed permanently.") },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            trackPendingDelete = null
+                            onDeleteTrack(track)
+                        },
+                    ) {
+                        Text("Delete", color = MaterialTheme.colorScheme.error)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { trackPendingDelete = null }) {
+                        Text("Cancel")
+                    }
+                },
+            )
         }
     }
 }

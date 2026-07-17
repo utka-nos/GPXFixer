@@ -1,14 +1,19 @@
 package com.gpxeditor.android.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -17,6 +22,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
@@ -124,6 +130,10 @@ fun TrackMapSection(
     }
 }
 
+/**
+ * Edge-to-edge track map: the map fills the whole screen with no insets and
+ * a translucent back button floats on top of it.
+ */
 @Composable
 fun TrackMapFullScreen(
     document: ActivityDocument,
@@ -133,28 +143,33 @@ fun TrackMapFullScreen(
         TrackMapGeometry.from(document)
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        Button(onClick = onBackClick) {
-            Text("Back")
-        }
+    BackHandler(onBack = onBackClick)
 
+    Box(modifier = Modifier.fillMaxSize()) {
         if (geometry == null) {
             Text(
                 text = "No track geometry",
                 style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.align(Alignment.Center),
             )
         } else {
             TrackMapPreview(
                 geometry = geometry,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
+                modifier = Modifier.fillMaxSize(),
                 isInteractive = true,
+            )
+        }
+
+        FilledTonalIconButton(
+            onClick = onBackClick,
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .windowInsetsPadding(WindowInsets.safeDrawing)
+                .padding(8.dp),
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = "Back",
             )
         }
     }

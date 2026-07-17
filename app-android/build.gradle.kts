@@ -52,6 +52,7 @@ dependencies {
     implementation(compose.runtime)
     implementation(compose.foundation)
     implementation(compose.material3)
+    implementation(libs.androidx.compose.material.icons.extended)
     implementation(compose.ui)
     implementation(libs.google.maps.compose)
     implementation(libs.play.services.location)
