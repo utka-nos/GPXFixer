@@ -7,16 +7,17 @@ import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ZoomOutMap
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -55,149 +56,150 @@ fun TrackChartFullScreen(
     var selectedSample by remember(samples) { mutableStateOf<TrackChartSample?>(null) }
     var chartSize by remember { mutableStateOf(IntSize.Zero) }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Button(onClick = onBackClick) {
-                Text("Back")
-            }
-            Spacer(modifier = Modifier.weight(1f))
-            if (window != null && window != fullWindow) {
-                TextButton(onClick = {
-                    window = fullWindow
-                    selectedSample = null
-                }) {
-                    Text("Reset zoom")
-                }
-            }
-        }
-
-        val currentWindow = window
-        if (fullWindow == null || currentWindow == null) {
-            Text(
-                text = "Not enough ${title.lowercase()} data to draw a chart.",
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            return@Column
-        }
-
-        val presentation = remember(samples, currentWindow, chartSize.width) {
-            TrackChartPresenter.presentation(
-                samples = samples,
-                window = currentWindow,
-                maxRenderPoints = (chartSize.width / 2).coerceAtLeast(300),
-            )
-        }
-
-        Text(
-            text = "$title, $unit",
-            style = MaterialTheme.typography.titleMedium,
-        )
-        Text(
-            text = listOfNotNull(
-                presentation.averageValue?.let { "Avg $it $unit" },
-                presentation.maxValue?.let { "Max $it $unit" },
-            ).joinToString(" · ") + " (visible range)",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-
-        val chartDescription = buildString {
-            append("$title chart from ")
-            append(TrackChartPresenter.formatElapsed(currentWindow.startSeconds))
-            append(" to ")
-            append(TrackChartPresenter.formatElapsed(currentWindow.endSeconds))
-            presentation.averageValue?.let { append(", average $it $unitLong") }
-            presentation.maxValue?.let { append(", maximum $it $unitLong") }
-            selectedSample?.let {
-                append(". Selected point at ")
-                append(TrackChartPresenter.formatElapsed(it.elapsedSeconds))
-                append(", ")
-                append(it.value)
-                append(" ")
-                append(unitLong)
-            }
-        }
-
-        TrackChartCanvas(
-            presentation = presentation,
-            selectedSample = selectedSample,
-            unit = unit,
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
-                .onSizeChanged { chartSize = it }
-                .semantics { contentDescription = chartDescription }
-                .pointerInput(samples, fullWindow) {
-                    awaitEachGesture {
-                        val down = awaitFirstDown()
-                        val geometry = chartGeometry(chartSize)
-                        selectedSample = window?.let { activeWindow ->
-                            sampleAt(samples, activeWindow, geometry, down.position.x)
-                        }
-                        var previousCentroidX: Float? = null
-                        var previousDistance: Float? = null
-                        while (true) {
-                            val event = awaitPointerEvent()
-                            val pressed = event.changes.filter { it.pressed }
-                            if (pressed.isEmpty()) break
-                            val activeWindow = window ?: break
-                            if (pressed.size == 1) {
-                                previousCentroidX = null
-                                previousDistance = null
-                                selectedSample =
-                                    sampleAt(samples, activeWindow, geometry, pressed[0].position.x)
-                            } else {
-                                selectedSample = null
-                                val centroidX = pressed.map { it.position.x }.average().toFloat()
-                                val distance = distanceBetween(
-                                    pressed[0].position,
-                                    pressed[1].position,
-                                )
-                                val lastCentroidX = previousCentroidX
-                                val lastDistance = previousDistance
-                                if (lastCentroidX != null && lastDistance != null && lastDistance > 0f) {
-                                    val secondsPerPx =
-                                        activeWindow.durationSeconds.toDouble() / geometry.plotWidth
-                                    val panSeconds =
-                                        (-(centroidX - lastCentroidX) * secondsPerPx).roundToLong()
-                                    val focusSeconds = geometry.xToSeconds(activeWindow, centroidX)
-                                    window = TrackChartPresenter.panned(
-                                        samples = samples,
-                                        window = TrackChartPresenter.zoomed(
-                                            samples = samples,
-                                            window = activeWindow,
-                                            factor = (distance / lastDistance).toDouble(),
-                                            focusSeconds = focusSeconds,
-                                        ),
-                                        deltaSeconds = panSeconds,
-                                    )
-                                }
-                                previousCentroidX = centroidX
-                                previousDistance = distance
-                            }
-                            pressed.forEach { it.consume() }
+    Scaffold(
+        topBar = {
+            AppTopBar(
+                title = "$title, $unit",
+                onBackClick = onBackClick,
+                actions = {
+                    if (window != null && window != fullWindow) {
+                        IconButton(onClick = {
+                            window = fullWindow
+                            selectedSample = null
+                        }) {
+                            Icon(
+                                imageVector = Icons.Default.ZoomOutMap,
+                                contentDescription = "Reset zoom",
+                            )
                         }
                     }
                 },
-        )
+            )
+        },
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            val currentWindow = window
+            if (fullWindow == null || currentWindow == null) {
+                Text(
+                    text = "Not enough ${title.lowercase()} data to draw a chart.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                return@Column
+            }
 
-        ChartPanSlider(
-            samples = samples,
-            fullWindow = fullWindow,
-            window = currentWindow,
-            onWindowChange = { newWindow ->
-                window = newWindow
-                selectedSample = null
-            },
-        )
+            val presentation = remember(samples, currentWindow, chartSize.width) {
+                TrackChartPresenter.presentation(
+                    samples = samples,
+                    window = currentWindow,
+                    maxRenderPoints = (chartSize.width / 2).coerceAtLeast(300),
+                )
+            }
+
+            Text(
+                text = listOfNotNull(
+                    presentation.averageValue?.let { "Avg $it $unit" },
+                    presentation.maxValue?.let { "Max $it $unit" },
+                ).joinToString(" · ") + " (visible range)",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            val chartDescription = buildString {
+                append("$title chart from ")
+                append(TrackChartPresenter.formatElapsed(currentWindow.startSeconds))
+                append(" to ")
+                append(TrackChartPresenter.formatElapsed(currentWindow.endSeconds))
+                presentation.averageValue?.let { append(", average $it $unitLong") }
+                presentation.maxValue?.let { append(", maximum $it $unitLong") }
+                selectedSample?.let {
+                    append(". Selected point at ")
+                    append(TrackChartPresenter.formatElapsed(it.elapsedSeconds))
+                    append(", ")
+                    append(it.value)
+                    append(" ")
+                    append(unitLong)
+                }
+            }
+
+            TrackChartCanvas(
+                presentation = presentation,
+                selectedSample = selectedSample,
+                unit = unit,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .onSizeChanged { chartSize = it }
+                    .semantics { contentDescription = chartDescription }
+                    .pointerInput(samples, fullWindow) {
+                        awaitEachGesture {
+                            val down = awaitFirstDown()
+                            val geometry = chartGeometry(chartSize)
+                            selectedSample = window?.let { activeWindow ->
+                                sampleAt(samples, activeWindow, geometry, down.position.x)
+                            }
+                            var previousCentroidX: Float? = null
+                            var previousDistance: Float? = null
+                            while (true) {
+                                val event = awaitPointerEvent()
+                                val pressed = event.changes.filter { it.pressed }
+                                if (pressed.isEmpty()) break
+                                val activeWindow = window ?: break
+                                if (pressed.size == 1) {
+                                    previousCentroidX = null
+                                    previousDistance = null
+                                    selectedSample =
+                                        sampleAt(samples, activeWindow, geometry, pressed[0].position.x)
+                                } else {
+                                    selectedSample = null
+                                    val centroidX = pressed.map { it.position.x }.average().toFloat()
+                                    val distance = distanceBetween(
+                                        pressed[0].position,
+                                        pressed[1].position,
+                                    )
+                                    val lastCentroidX = previousCentroidX
+                                    val lastDistance = previousDistance
+                                    if (lastCentroidX != null && lastDistance != null && lastDistance > 0f) {
+                                        val secondsPerPx =
+                                            activeWindow.durationSeconds.toDouble() / geometry.plotWidth
+                                        val panSeconds =
+                                            (-(centroidX - lastCentroidX) * secondsPerPx).roundToLong()
+                                        val focusSeconds = geometry.xToSeconds(activeWindow, centroidX)
+                                        window = TrackChartPresenter.panned(
+                                            samples = samples,
+                                            window = TrackChartPresenter.zoomed(
+                                                samples = samples,
+                                                window = activeWindow,
+                                                factor = (distance / lastDistance).toDouble(),
+                                                focusSeconds = focusSeconds,
+                                            ),
+                                            deltaSeconds = panSeconds,
+                                        )
+                                    }
+                                    previousCentroidX = centroidX
+                                    previousDistance = distance
+                                }
+                                pressed.forEach { it.consume() }
+                            }
+                        }
+                    },
+            )
+
+            ChartPanSlider(
+                samples = samples,
+                fullWindow = fullWindow,
+                window = currentWindow,
+                onWindowChange = { newWindow ->
+                    window = newWindow
+                    selectedSample = null
+                },
+            )
+        }
     }
 }
 

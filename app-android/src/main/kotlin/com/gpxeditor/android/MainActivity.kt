@@ -11,6 +11,7 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.ActivityResultLauncher
 import androidx.core.content.FileProvider
 import com.gpxeditor.android.data.imported.AndroidGpxTrackFileStorage
@@ -52,6 +53,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
 
         val fileStorage = AndroidGpxTrackFileStorage(applicationContext)
         val importedTrackStore = JsonImportedTrackStore(applicationContext)
