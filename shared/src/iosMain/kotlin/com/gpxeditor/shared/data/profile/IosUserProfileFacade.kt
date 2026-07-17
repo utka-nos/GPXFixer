@@ -48,10 +48,16 @@ private class IosUserProfileStorage : UserProfileStorage {
     }
 }
 
+/**
+ * All facade instances share one repository so a profile saved on one screen
+ * reaches every other screen observing it.
+ */
+private val sharedRepository by lazy { UserProfileRepository(IosUserProfileStorage()) }
+
 /** Callback-based facade that keeps coroutine APIs from leaking into SwiftUI. */
 class IosUserProfileFacade {
     private val scope = MainScope()
-    private val repository = UserProfileRepository(IosUserProfileStorage())
+    private val repository = sharedRepository
     private var observeJob: Job? = null
 
     fun profile(): UserProfile = repository.profile.value
