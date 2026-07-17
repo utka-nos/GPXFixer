@@ -38,6 +38,12 @@ struct IOSImportScreen: View {
                         Label("Heart rate sensor", systemImage: "heart")
                     }
 
+                    NavigationLink {
+                        IOSProfileScreen()
+                    } label: {
+                        Label("Profile", systemImage: "person.crop.circle")
+                    }
+
                     if viewModel.isImporting {
                         ProgressView("Importing")
                     }

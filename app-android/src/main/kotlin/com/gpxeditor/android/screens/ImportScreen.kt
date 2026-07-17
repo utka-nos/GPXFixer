@@ -9,6 +9,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FiberManualRecord
+import androidx.compose.material.icons.filled.ManageAccounts
 import androidx.compose.material.icons.filled.Sensors
 import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material3.AlertDialog
@@ -29,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import com.gpxeditor.android.ImportScreenState
 import com.gpxeditor.android.recording.HeartRateSensorController
 import com.gpxeditor.android.recording.PowerSensorController
+import com.gpxeditor.shared.data.profile.UserProfileRepository
 import com.gpxeditor.shared.domain.activity.ActivityDocument
 import com.gpxeditor.shared.domain.imported.ImportedTrack
 import com.gpxeditor.shared.feature.edittrack.DeleteGpxTrackPointResult
@@ -59,10 +61,12 @@ fun ImportScreen(
     onDiscardRecording: () -> Unit,
     powerSensorController: PowerSensorController,
     heartRateSensorController: HeartRateSensorController,
+    userProfileRepository: UserProfileRepository,
 ) {
     var trackPendingDelete by remember { mutableStateOf<ImportedTrack?>(null) }
     var isRecordingOpen by remember { mutableStateOf(false) }
     var isSensorsOpen by remember { mutableStateOf(false) }
+    var isProfileOpen by remember { mutableStateOf(false) }
 
     MaterialTheme {
         if (isRecordingOpen) {
@@ -80,6 +84,14 @@ fun ImportScreen(
                 powerSensorController = powerSensorController,
                 heartRateSensorController = heartRateSensorController,
                 onBackClick = { isSensorsOpen = false },
+            )
+            return@MaterialTheme
+        }
+
+        if (isProfileOpen) {
+            ProfileScreen(
+                repository = userProfileRepository,
+                onBackClick = { isProfileOpen = false },
             )
             return@MaterialTheme
         }
@@ -150,6 +162,12 @@ fun ImportScreen(
                             Icon(
                                 imageVector = Icons.Default.Sensors,
                                 contentDescription = "Sensors",
+                            )
+                        }
+                        IconButton(onClick = { isProfileOpen = true }) {
+                            Icon(
+                                imageVector = Icons.Default.ManageAccounts,
+                                contentDescription = "Edit profile",
                             )
                         }
                     },
