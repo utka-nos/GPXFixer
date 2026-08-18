@@ -45,6 +45,7 @@ fun ProfileScreen(
     val savedProfile = remember { repository.profile.value }
 
     var weightText by remember { mutableStateOf(savedProfile.weightKg?.let(::formatWeightKg) ?: "") }
+    var bikeWeightText by remember { mutableStateOf(savedProfile.bikeWeightKg?.let(::formatWeightKg) ?: "") }
     var sex by remember { mutableStateOf(savedProfile.sex) }
     var birthYearText by remember { mutableStateOf(savedProfile.birthYear?.toString() ?: "") }
     var maxHeartRateText by remember { mutableStateOf("") }
@@ -61,6 +62,7 @@ fun ProfileScreen(
     fun save() {
         val result = buildProfile(
             weightText = weightText,
+            bikeWeightText = bikeWeightText,
             sex = sex,
             birthYearText = birthYearText,
             heartRateBoundTexts = heartRateBoundTexts,
@@ -100,6 +102,15 @@ fun ProfileScreen(
             errorMessage = errors[ProfileField.WEIGHT],
             allowDecimals = true,
             onValueChange = { weightText = it },
+        )
+
+        ProfileNumberField(
+            label = "Bike weight (kg)",
+            value = bikeWeightText,
+            errorMessage = errors[ProfileField.BIKE_WEIGHT],
+            allowDecimals = true,
+            placeholder = "Defaults to ${formatWeightKg(UserProfile.DEFAULT_BIKE_WEIGHT_KG)} kg",
+            onValueChange = { bikeWeightText = it },
         )
 
         Text("Sex", style = MaterialTheme.typography.titleMedium)
@@ -235,12 +246,14 @@ private fun ProfileNumberField(
     errorMessage: String?,
     onValueChange: (String) -> Unit,
     allowDecimals: Boolean = false,
+    placeholder: String? = null,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         OutlinedTextField(
             value = value,
             onValueChange = onValueChange,
             label = { Text(label) },
+            placeholder = placeholder?.let { text -> { Text(text) } },
             singleLine = true,
             isError = errorMessage != null,
             keyboardOptions = KeyboardOptions(
@@ -263,6 +276,7 @@ private fun ErrorText(message: String) {
 
 internal enum class ProfileField {
     WEIGHT,
+    BIKE_WEIGHT,
     BIRTH_YEAR,
     MAX_HEART_RATE,
     HEART_RATE_ZONES,
@@ -278,6 +292,7 @@ internal data class ProfileBuildResult(
 /** Parses the raw field texts into a profile, collecting one inline error message per field. */
 internal fun buildProfile(
     weightText: String,
+    bikeWeightText: String,
     sex: Sex?,
     birthYearText: String,
     heartRateBoundTexts: List<String>,
@@ -292,6 +307,15 @@ internal fun buildProfile(
         if (parsed == null || !ProfileValidation.isValidWeight(parsed)) {
             errors[ProfileField.WEIGHT] = "Enter a weight between " +
                 "${ProfileValidation.MIN_WEIGHT_KG.toInt()} and ${ProfileValidation.MAX_WEIGHT_KG.toInt()} kg"
+        }
+        parsed
+    }
+
+    val bikeWeightKg = bikeWeightText.trim().replace(',', '.').takeIf(String::isNotEmpty)?.let { text ->
+        val parsed = text.toDoubleOrNull()
+        if (parsed == null || !ProfileValidation.isValidBikeWeight(parsed)) {
+            errors[ProfileField.BIKE_WEIGHT] = "Enter a bike weight between " +
+                "${ProfileValidation.MIN_BIKE_WEIGHT_KG.toInt()} and ${ProfileValidation.MAX_BIKE_WEIGHT_KG.toInt()} kg"
         }
         parsed
     }
@@ -335,6 +359,7 @@ internal fun buildProfile(
     return ProfileBuildResult(
         profile = UserProfile(
             weightKg = weightKg,
+            bikeWeightKg = bikeWeightKg,
             sex = sex,
             birthYear = birthYear,
             heartRateZones = heartRateBounds?.let(::HeartRateZones),

@@ -15,6 +15,7 @@ class BuildProfileTest {
 
     private fun build(
         weightText: String = "",
+        bikeWeightText: String = "",
         sex: Sex? = null,
         birthYearText: String = "",
         heartRateBoundTexts: List<String> = emptyHeartRateBounds,
@@ -22,6 +23,7 @@ class BuildProfileTest {
         powerBoundTexts: List<String> = emptyPowerBounds,
     ) = buildProfile(
         weightText = weightText,
+        bikeWeightText = bikeWeightText,
         sex = sex,
         birthYearText = birthYearText,
         heartRateBoundTexts = heartRateBoundTexts,
@@ -42,6 +44,7 @@ class BuildProfileTest {
     fun parsesAllFields() {
         val result = build(
             weightText = "72,5",
+            bikeWeightText = "8,4",
             sex = Sex.FEMALE,
             birthYearText = "1990",
             heartRateBoundTexts = listOf("114", "133", "152", "171"),
@@ -53,6 +56,7 @@ class BuildProfileTest {
         assertEquals(
             UserProfile(
                 weightKg = 72.5,
+                bikeWeightKg = 8.4,
                 sex = Sex.FEMALE,
                 birthYear = 1990,
                 heartRateZones = HeartRateZones(listOf(114, 133, 152, 171)),
@@ -69,6 +73,22 @@ class BuildProfileTest {
 
         assertNull(result.profile)
         assertEquals(setOf(ProfileField.WEIGHT, ProfileField.BIRTH_YEAR), result.errors.keys)
+    }
+
+    @Test
+    fun reportsBikeWeightOutsideItsOwnRange() {
+        val result = build(bikeWeightText = "60")
+
+        assertNull(result.profile)
+        assertEquals(setOf(ProfileField.BIKE_WEIGHT), result.errors.keys)
+    }
+
+    @Test
+    fun leavesBikeWeightUnsetWhenBlank() {
+        val result = build(weightText = "72.5")
+
+        assertTrue(result.errors.isEmpty())
+        assertNull(result.profile?.bikeWeightKg)
     }
 
     @Test

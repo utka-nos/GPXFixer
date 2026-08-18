@@ -15,6 +15,15 @@ class ProfileValidationTest {
     }
 
     @Test
+    fun acceptsBikeWeightWithinSaneRange() {
+        assertTrue(ProfileValidation.isValidBikeWeight(9.0))
+        assertTrue(ProfileValidation.isValidBikeWeight(3.0))
+        assertTrue(ProfileValidation.isValidBikeWeight(50.0))
+        assertFalse(ProfileValidation.isValidBikeWeight(2.9))
+        assertFalse(ProfileValidation.isValidBikeWeight(50.1))
+    }
+
+    @Test
     fun acceptsBirthYearBetween1900AndCurrentYear() {
         assertTrue(ProfileValidation.isValidBirthYear(1990, currentYear = 2026))
         assertTrue(ProfileValidation.isValidBirthYear(2026, currentYear = 2026))

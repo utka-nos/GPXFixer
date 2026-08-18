@@ -42,6 +42,8 @@ data class PowerZones(val upperBoundsWatts: List<Int>) {
 /** Global user profile; every field is optional so features consuming one can stay hidden until it is set. */
 data class UserProfile(
     val weightKg: Double? = null,
+    /** Weight of the bike; consumers fall back to [UserProfile.DEFAULT_BIKE_WEIGHT_KG] when unset. */
+    val bikeWeightKg: Double? = null,
     val sex: Sex? = null,
     val birthYear: Int? = null,
     val heartRateZones: HeartRateZones? = null,
@@ -50,5 +52,8 @@ data class UserProfile(
 ) {
     companion object {
         val EMPTY = UserProfile()
+
+        /** Assumed bike weight while [bikeWeightKg] is unset, so power maths always has a total mass. */
+        const val DEFAULT_BIKE_WEIGHT_KG = 9.0
     }
 }

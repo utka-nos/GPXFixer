@@ -17,6 +17,7 @@ private class FakeUserProfileStorage(var content: String? = null) : UserProfileS
 class UserProfileRepositoryTest {
     private val profile = UserProfile(
         weightKg = 72.5,
+        bikeWeightKg = 8.4,
         sex = Sex.MALE,
         birthYear = 1990,
         heartRateZones = HeartRateZones(listOf(114, 133, 152, 171)),
