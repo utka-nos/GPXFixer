@@ -11,6 +11,7 @@ import kotlin.test.assertNull
 class UserProfileJsonTest {
     private val fullProfile = UserProfile(
         weightKg = 72.5,
+        bikeWeightKg = 8.4,
         sex = Sex.FEMALE,
         birthYear = 1990,
         heartRateZones = HeartRateZones(listOf(114, 133, 152, 171)),
@@ -33,6 +34,14 @@ class UserProfileJsonTest {
     @Test
     fun roundTripsEmptyProfile() {
         assertEquals(UserProfile.EMPTY, UserProfileJson.decode(UserProfileJson.encode(UserProfile.EMPTY)))
+    }
+
+    @Test
+    fun decodeReadsProfileSavedBeforeBikeWeightExisted() {
+        val decoded = UserProfileJson.decode("{\"weightKg\":72.5,\"ftpWatts\":250}")
+
+        assertEquals(UserProfile(weightKg = 72.5, ftpWatts = 250), decoded)
+        assertNull(decoded?.bikeWeightKg)
     }
 
     @Test

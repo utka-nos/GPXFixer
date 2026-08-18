@@ -19,6 +19,7 @@ internal object UserProfileJson {
             append(rawValue)
         }
         profile.weightKg?.let { appendProperty("weightKg", it.toString()) }
+        profile.bikeWeightKg?.let { appendProperty("bikeWeightKg", it.toString()) }
         profile.sex?.let { appendProperty("sex", "\"${it.name}\"") }
         profile.birthYear?.let { appendProperty("birthYear", it.toString()) }
         profile.heartRateZones?.let {
@@ -40,6 +41,7 @@ internal object UserProfileJson {
         if (powerBounds != null && powerBounds.size != PowerZones.BOUNDARY_COUNT) return null
         return UserProfile(
             weightKg = values["weightKg"] as? Double,
+            bikeWeightKg = values["bikeWeightKg"] as? Double,
             sex = (values["sex"] as? String)?.let { name -> Sex.entries.firstOrNull { it.name == name } },
             birthYear = values.int("birthYear"),
             heartRateZones = heartRateBounds?.let(::HeartRateZones),

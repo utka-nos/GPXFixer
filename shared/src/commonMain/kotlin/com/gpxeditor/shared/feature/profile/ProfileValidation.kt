@@ -9,6 +9,8 @@ enum class ZoneBoundsError {
 object ProfileValidation {
     const val MIN_WEIGHT_KG = 20.0
     const val MAX_WEIGHT_KG = 400.0
+    const val MIN_BIKE_WEIGHT_KG = 3.0
+    const val MAX_BIKE_WEIGHT_KG = 50.0
     const val MIN_BIRTH_YEAR = 1900
     const val MIN_HEART_RATE_BPM = 40
     const val MAX_HEART_RATE_BPM = 250
@@ -18,6 +20,9 @@ object ProfileValidation {
     const val MAX_POWER_BOUND_WATTS = 3000
 
     fun isValidWeight(weightKg: Double): Boolean = weightKg in MIN_WEIGHT_KG..MAX_WEIGHT_KG
+
+    fun isValidBikeWeight(bikeWeightKg: Double): Boolean =
+        bikeWeightKg in MIN_BIKE_WEIGHT_KG..MAX_BIKE_WEIGHT_KG
 
     fun isValidBirthYear(birthYear: Int, currentYear: Int): Boolean = birthYear in MIN_BIRTH_YEAR..currentYear
 

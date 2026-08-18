@@ -6,6 +6,7 @@ import shared
 final class IOSProfileViewModel: ObservableObject {
     enum Field: Hashable {
         case weight
+        case bikeWeight
         case birthYear
         case maxHeartRate
         case heartRateZones
@@ -38,6 +39,7 @@ final class IOSProfileViewModel: ObservableObject {
     }
 
     @Published var weightText = ""
+    @Published var bikeWeightText = ""
     @Published var sexChoice = SexChoice.notSet
     @Published var birthYearText = ""
     @Published var maxHeartRateText = ""
@@ -52,11 +54,8 @@ final class IOSProfileViewModel: ObservableObject {
 
     init() {
         let profile = facade.profile()
-        if let weight = profile.weightKg?.doubleValue {
-            weightText = weight.truncatingRemainder(dividingBy: 1) == 0
-                ? String(Int(weight))
-                : String(weight)
-        }
+        weightText = Self.formatWeight(profile.weightKg?.doubleValue)
+        bikeWeightText = Self.formatWeight(profile.bikeWeightKg?.doubleValue)
         sexChoice = SexChoice.from(profile.sex)
         if let birthYear = profile.birthYear?.intValue {
             birthYearText = String(birthYear)
@@ -70,6 +69,13 @@ final class IOSProfileViewModel: ObservableObject {
         if let zones = profile.powerZones {
             powerBoundTexts = zones.upperBoundsWatts.map { String($0.intValue) }
         }
+    }
+
+    private static func formatWeight(_ weightKg: Double?) -> String {
+        guard let weightKg else { return "" }
+        return weightKg.truncatingRemainder(dividingBy: 1) == 0
+            ? String(Int(weightKg))
+            : String(weightKg)
     }
 
     var canEstimateMaxHeartRate: Bool {
@@ -131,6 +137,19 @@ final class IOSProfileViewModel: ObservableObject {
             }
         }
 
+        var bikeWeightKg: KotlinDouble?
+        let bikeWeightTrimmed = bikeWeightText
+            .replacingOccurrences(of: ",", with: ".")
+            .trimmingCharacters(in: .whitespaces)
+        if !bikeWeightTrimmed.isEmpty {
+            if let parsed = Double(bikeWeightTrimmed),
+               ProfileValidation.shared.isValidBikeWeight(bikeWeightKg: parsed) {
+                bikeWeightKg = KotlinDouble(value: parsed)
+            } else {
+                newErrors[.bikeWeight] = "Enter a bike weight between 3 and 50 kg"
+            }
+        }
+
         var birthYear: KotlinInt?
         let birthYearTrimmed = birthYearText.trimmingCharacters(in: .whitespaces)
         if !birthYearTrimmed.isEmpty {
@@ -175,6 +194,7 @@ final class IOSProfileViewModel: ObservableObject {
         facade.save(
             profile: UserProfile(
                 weightKg: weightKg,
+                bikeWeightKg: bikeWeightKg,
                 sex: sexChoice.shared,
                 birthYear: birthYear,
                 heartRateZones: heartRateBounds.map { HeartRateZones(upperBoundsBpm: $0) },
@@ -231,6 +251,13 @@ struct IOSProfileScreen: View {
                         .multilineTextAlignment(.trailing)
                 }
                 fieldError(.weight)
+
+                LabeledContent("Bike weight (kg)") {
+                    TextField("Defaults to 9", text: $viewModel.bikeWeightText)
+                        .keyboardType(.decimalPad)
+                        .multilineTextAlignment(.trailing)
+                }
+                fieldError(.bikeWeight)
 
                 Picker("Sex", selection: $viewModel.sexChoice) {
                     ForEach(IOSProfileViewModel.SexChoice.allCases) { choice in
